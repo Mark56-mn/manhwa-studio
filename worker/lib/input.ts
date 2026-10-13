@@ -94,6 +94,23 @@ export class Input {
     return parsed
   }
 
+  /** Optional decimal number, e.g. a sampling temperature. */
+  number(field: string, { min = -1000000, max = 1000000 }: { min?: number; max?: number } = {}): number | undefined {
+    if (!this.has(field)) return undefined
+    const value = this.raw(field)
+    if (value === null) return undefined
+    const parsed = typeof value === 'string' ? Number(value) : value
+    if (typeof parsed !== 'number' || !Number.isFinite(parsed)) {
+      this.fail(field, 'Must be a number')
+      return undefined
+    }
+    if (parsed < min || parsed > max) {
+      this.fail(field, `Must be between ${min} and ${max}`)
+      return undefined
+    }
+    return parsed
+  }
+
   /** Throws a 400 carrying every field error found so far. */
   assertClean(): void {
     if (this.errors.length > 0) {

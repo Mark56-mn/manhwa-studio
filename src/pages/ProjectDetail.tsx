@@ -271,6 +271,9 @@ function EpisodesTab({
                 </div>
                 <div className="row-side">
                   <EpisodeStatusPill status={episode.status} />
+                  <Button variant="ghost" type="button" onClick={() => navigate(`/episodes/${episode.id}`)}>
+                    Open
+                  </Button>
                   <Select
                     aria-label={`Status for ${episode.title}`}
                     value={episode.status}
@@ -309,10 +312,10 @@ function EpisodesTab({
           </ul>
         )}
         <p className="hint">
-          Script, art, audio and video generation are not implemented in this build, so statuses are set manually by
-          you.{' '}
-          <button className="link" type="button" onClick={() => navigate('/projects')}>
-            Back to projects
+          Open an episode to write its script with a configured provider. Art, audio and video generation arrive in
+          later tasks, so those statuses are still set manually.{' '}
+          <button className="link" type="button" onClick={() => navigate('/integrations')}>
+            Configure providers
           </button>
         </p>
       </Card>

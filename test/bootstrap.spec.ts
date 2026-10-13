@@ -5,7 +5,19 @@ import { MIGRATIONS, MIGRATIONS_TABLE, splitStatements } from '../worker/migrati
 import { AUTHOR, call, json } from './helpers'
 
 const ORIGIN = 'http://localhost:8787'
-const TABLES = ['activity_events', 'characters', 'episodes', 'seasons', 'projects', 'users', 'd1_migrations']
+const TABLES = [
+  'script_approvals',
+  'scenes',
+  'script_versions',
+  'provider_checks',
+  'activity_events',
+  'characters',
+  'episodes',
+  'seasons',
+  'projects',
+  'users',
+  'd1_migrations',
+]
 
 async function dropTables(tables: string[] = TABLES): Promise<void> {
   const db = (env as unknown as { DB: D1Database }).DB
@@ -43,9 +55,9 @@ describe('database initialization', () => {
     expect(body.status).toBe('degraded')
     expect(body.checks.database.state).toBe('failed')
     expect(body.checks.database.detail).toContain('no studio schema yet')
-    expect(body.checks.database.missing).toHaveLength(6)
+    expect(body.checks.database.missing).toHaveLength(10)
     expect(body.migrations.applied).toBe(false)
-    expect(body.migrations.pending).toEqual(['0001_init.sql'])
+    expect(body.migrations.pending).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
   })
 
   it('creates the schema once, then reports the database as verified', async () => {
@@ -53,7 +65,7 @@ describe('database initialization', () => {
     expect(first.status).toBe(200)
     const firstBody = (await first.json()) as { status: string; applied: string[]; detail: string }
     expect(firstBody.status).toBe('initialized')
-    expect(firstBody.applied).toEqual(['0001_init.sql'])
+    expect(firstBody.applied).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
 
     const health = (await (await SELF.fetch(`${ORIGIN}/api/health`)).json()) as {
       checks: { database: { state: string } }
@@ -61,11 +73,36 @@ describe('database initialization', () => {
     }
     expect(health.checks.database.state).toBe('connected_verified')
     expect(health.migrations.applied).toBe(true)
-    expect(health.migrations.recorded).toEqual(['0001_init.sql'])
+    expect(health.migrations.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
 
     const again = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
     expect(again.status).toBe(200)
     expect((await again.json()) as { status: string }).toMatchObject({ status: 'already_initialized' })
+  })
+
+  it('upgrades an existing Phase-A database by applying only the pending migration', async () => {
+    const db = (env as unknown as { DB: D1Database }).DB
+    // First reach the full current schema, then rewind to a Phase-A-only state.
+    await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
+    await db.batch([
+      db.prepare('DROP TABLE IF EXISTS script_approvals'),
+      db.prepare('DROP TABLE IF EXISTS scenes'),
+      db.prepare('DROP TABLE IF EXISTS script_versions'),
+      db.prepare('DROP TABLE IF EXISTS provider_checks'),
+      db.prepare("DELETE FROM d1_migrations WHERE name = '0002_phase_b_scripts.sql'"),
+    ])
+
+    const response = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { status: string; applied: string[]; recorded: string[] }
+    expect(body.status).toBe('upgraded')
+    expect(body.applied).toEqual(['0002_phase_b_scripts.sql'])
+    expect(body.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
+
+    const health = (await (await SELF.fetch(`${ORIGIN}/api/health`)).json()) as {
+      checks: { database: { state: string } }
+    }
+    expect(health.checks.database.state).toBe('connected_verified')
   })
 
   it('refuses to touch a partially present schema', async () => {

@@ -22,8 +22,8 @@ const assetsStub = {
     }),
 }
 
-export function testEnv(): Env {
-  return { ...(env as unknown as Env), ASSETS: assetsStub }
+export function testEnv(overrides: Partial<Env> = {}): Env {
+  return { ...(env as unknown as Env), ASSETS: assetsStub, ...overrides }
 }
 
 /** Calls the app with a fixed signed-in identity, like the real wrapper does. */
@@ -31,6 +31,7 @@ export async function call(
   user: FreebuffUser | null,
   path: string,
   init: RequestInit = {},
+  envOverrides: Partial<Env> = {},
 ): Promise<Response> {
   const app = createApp({ getUser: async () => user })
   const headers = new Headers(init.headers)
@@ -39,13 +40,17 @@ export async function call(
     headers.set('Origin', ORIGIN)
   }
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json')
-  return app.request(path, { ...init, method, headers }, testEnv())
+  return app.request(path, { ...init, method, headers }, testEnv(envOverrides))
 }
 
 /** The test pool shares one D1 database between tests, so each test resets it. */
 export async function resetDatabase(): Promise<void> {
   const db = (env as unknown as Env).DB
   await db.batch([
+    db.prepare('DELETE FROM script_approvals'),
+    db.prepare('DELETE FROM scenes'),
+    db.prepare('DELETE FROM script_versions'),
+    db.prepare('DELETE FROM provider_checks'),
     db.prepare('DELETE FROM activity_events'),
     db.prepare('DELETE FROM characters'),
     db.prepare('DELETE FROM episodes'),
@@ -57,6 +62,27 @@ export async function resetDatabase(): Promise<void> {
 
 export async function json<T = Record<string, unknown>>(response: Response): Promise<T> {
   return (await response.json()) as T
+}
+
+/** Provider configuration used by the script specs: a fake key plus a model. */
+export const PROVIDER_ENV: Record<string, string> = {
+  SCRIPT_PROVIDER: 'openai',
+  SCRIPT_API_KEY: 'test-key-not-a-real-secret',
+  SCRIPT_MODEL: 'gpt-6-luna',
+}
+
+export async function createEpisode(
+  user: FreebuffUser,
+  projectId: string,
+  title = 'Episode One',
+): Promise<{ id: string; episodeNumber: number }> {
+  const response = await call(user, `/api/projects/${projectId}/episodes`, {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  })
+  if (response.status !== 201) throw new Error(`createEpisode failed: ${response.status} ${await response.text()}`)
+  const body = await json<{ episode: { id: string; episodeNumber: number } }>(response)
+  return body.episode
 }
 
 export async function createProject(user: FreebuffUser, title = 'Test Story'): Promise<{ id: string; title: string }> {

@@ -6,6 +6,7 @@ import { fetchHealth, fetchSession } from './lib/api'
 import { matchRoute, useRoute } from './lib/router'
 import { Bootstrap } from './pages/Bootstrap'
 import { Dashboard } from './pages/Dashboard'
+import { EpisodeWorkspace } from './pages/EpisodeWorkspace'
 import { Integrations } from './pages/Integrations'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
@@ -54,6 +55,8 @@ export function App() {
     page = <Projects navigate={navigate} />
   } else if (route.name === 'project' && route.projectId) {
     page = <ProjectDetail key={route.projectId} projectId={route.projectId} navigate={navigate} />
+  } else if (route.name === 'episode' && route.episodeId) {
+    page = <EpisodeWorkspace key={route.episodeId} episodeId={route.episodeId} navigate={navigate} />
   } else if (route.name === 'integrations') {
     page = <Integrations user={user} />
   } else {

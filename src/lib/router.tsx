@@ -23,8 +23,9 @@ export function useRoute(): { path: string; navigate: (to: string) => void } {
 }
 
 export interface RouteMatch {
-  name: 'dashboard' | 'projects' | 'project' | 'integrations' | 'not-found'
+  name: 'dashboard' | 'projects' | 'project' | 'episode' | 'integrations' | 'not-found'
   projectId?: string
+  episodeId?: string
 }
 
 export function matchRoute(path: string): RouteMatch {
@@ -33,6 +34,9 @@ export function matchRoute(path: string): RouteMatch {
   if (segments[0] === 'projects') {
     if (segments.length === 1) return { name: 'projects' }
     if (segments.length === 2) return { name: 'project', projectId: decodeURIComponent(segments[1] ?? '') }
+  }
+  if (segments[0] === 'episodes' && segments.length === 2) {
+    return { name: 'episode', episodeId: decodeURIComponent(segments[1] ?? '') }
   }
   if (segments[0] === 'integrations') return { name: 'integrations' }
   return { name: 'not-found' }

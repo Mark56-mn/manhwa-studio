@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 
-import { capabilityStatuses } from '../capabilities'
+import { capabilityStatuses, mediaStorageStatus } from '../capabilities'
 import { REQUIRED_TABLES } from '../lib/constants'
-import { inspectSchema } from '../migrations'
+import { LATEST_MIGRATION, inspectSchema } from '../migrations'
 import type { IntegrationState } from '../capabilities'
 import type { AppBindings } from '../app'
 
@@ -92,7 +92,8 @@ healthRoutes.get('/health', async (c) => {
   const auth = checkAuth(env)
 
   const ready = database.state === 'connected_verified' && assets.state === 'connected_verified'
-  const capabilities = capabilityStatuses(env)
+  const capabilities = await capabilityStatuses(env.DB, env)
+  const storage = mediaStorageStatus(env)
   let schema = { missing: [] as string[], applied: [] as string[], pending: [] as string[] }
   try {
     schema = await inspectSchema(env.DB)
@@ -112,8 +113,8 @@ healthRoutes.get('/health', async (c) => {
         assets,
         auth,
         mediaStorage: {
-          state: 'not_configured',
-          detail: 'No object-storage bucket is attached yet; media artifacts arrive in Phase B.',
+          state: storage.state,
+          detail: storage.detail,
         },
       },
       capabilities: capabilities.map((capability) => ({
@@ -122,7 +123,7 @@ healthRoutes.get('/health', async (c) => {
         state: capability.state,
       })),
       migrations: {
-        current: '0001_init.sql',
+        current: LATEST_MIGRATION,
         applied: database.state === 'connected_verified',
         recorded: schema.applied,
         pending: schema.pending,

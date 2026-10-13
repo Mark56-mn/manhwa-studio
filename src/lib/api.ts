@@ -83,6 +83,16 @@ export type IntegrationState =
   | 'not_configured'
   | 'failed'
 
+export interface CapabilityProvider {
+  id: string
+  label: string
+  docsUrl: string
+  keyEnvVars: string[]
+  defaultModel: string
+  needsBaseUrl: boolean
+  selected: boolean
+}
+
 export interface Capability {
   id: string
   label: string
@@ -91,6 +101,103 @@ export interface Capability {
   detail: string
   requiredEnvVars: string[]
   presentEnvVars: string[]
+  /** False when this build contains no adapter for the capability yet. */
+  implemented: boolean
+  providers?: CapabilityProvider[]
+  model?: string | null
+  models?: string[]
+  verifiedAt?: string | null
+}
+
+export interface ProviderCheckResult {
+  capability: string
+  provider: string
+  providerLabel: string
+  model: string | null
+  ok: boolean
+  detail: string
+  latencyMs: number
+  models: string[]
+  code: string | null
+}
+
+export type ScriptParseState = 'parsed' | 'unparsed'
+export type ScriptStatus = 'draft' | 'approved' | 'rejected'
+export type ReviewDecision = 'approved' | 'rejected' | 'changes_requested'
+
+export interface ScriptSummary {
+  id: string
+  episodeId: string
+  version: number
+  status: ScriptStatus
+  provider: string
+  model: string
+  parseState: ScriptParseState
+  parseDetail: string | null
+  sceneCount: number
+  characterCount: number
+  inputTokens: number | null
+  outputTokens: number | null
+  createdBy: string
+  createdAt: string
+}
+
+export interface ParsedScriptBody {
+  title?: string
+  logline?: string
+  scenes?: unknown[]
+  continuityNotes?: string
+}
+
+export interface ScriptVersion extends ScriptSummary {
+  instructions: string
+  rawText: string
+  structured: ParsedScriptBody | null
+}
+
+export interface DialogueLine {
+  speaker: string
+  line: string
+}
+
+export interface ScriptScene {
+  id: string
+  scriptId: string
+  index: number
+  heading: string
+  description: string
+  narration: string
+  dialogue: DialogueLine[]
+  imagePrompt: string
+  createdAt: string
+}
+
+export interface ScriptApproval {
+  id: string
+  scriptId: string
+  decision: ReviewDecision
+  note: string
+  decidedBy: string
+  createdAt: string
+}
+
+export interface ScriptList {
+  episodeId: string
+  episodeStatus: EpisodeStatus
+  scripts: ScriptSummary[]
+  approvals: ScriptApproval[]
+}
+
+export interface ScriptDetail {
+  script: ScriptVersion
+  scenes: ScriptScene[]
+  approvals: ScriptApproval[]
+  episodeStatus: EpisodeStatus
+}
+
+export interface EpisodeDetail {
+  episode: Episode
+  project: { id: string; title: string } | null
 }
 
 export interface HealthReport {

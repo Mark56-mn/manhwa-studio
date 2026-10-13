@@ -69,6 +69,11 @@ overviewRoutes.get('/overview', async (c) => {
       inDraft: countOf('script_drafting', 'art_generating', 'audio_generating', 'video_assembling'),
     },
     recentActivity: (recent.results ?? []).map(serializeActivity),
-    capabilities: capabilityStatuses(c.env).map(({ id, label, state, detail }) => ({ id, label, state, detail })),
+    capabilities: (await capabilityStatuses(c.env.DB, c.env)).map(({ id, label, state, detail }) => ({
+      id,
+      label,
+      state,
+      detail,
+    })),
   })
 })

@@ -93,11 +93,38 @@ npm run verify       # all of the above
 | `FREEBUFF_ISSUER` | OIDC issuer (`https://freebuff.com/oidc`) | same |
 | `APP_ORIGIN` | Canonical site origin, used for callbacks and CSRF | same |
 | `APP_VERSION` | Shown by `/api/health` | same |
-| `SCRIPT_*`, `IMAGE_*`, `VOICE_*`, `RENDER_*`, `YOUTUBE_*` | Reserved for Phase B/C/D providers | Deployment secrets — **not set yet, none are read yet** |
+| `SCRIPT_PROVIDER`, `SCRIPT_API_KEY`, `SCRIPT_MODEL`, `SCRIPT_BASE_URL`, `SCRIPT_MAX_OUTPUT_TOKENS` | **Script AI (implemented, Phase B)** | Set as deployment secrets to enable script generation |
+| `IMAGE_*`, `VOICE_*`, `RENDER_*`, `YOUTUBE_*` | Later phases — no adapter in this build | Not read; the studio reports them honestly as not built |
 
 There are **no secrets in this repository**, and there is no client secret for
 sign-in. Provider API keys, when they exist, go into the deployment's secret
 store (never into the repo, never into the browser).
+
+### Enabling Script AI (Phase B)
+
+1. Pick a provider and set its variables as **deployment secrets**
+   (Sites → Secrets, or `wrangler secret put` when deploying with wrangler):
+
+   | Provider | `SCRIPT_PROVIDER` | Key variable |
+   | --- | --- | --- |
+   | OpenAI | `openai` | `SCRIPT_API_KEY` or `OPENAI_API_KEY` |
+   | OpenRouter | `openrouter` | `SCRIPT_API_KEY` or `OPENROUTER_API_KEY` |
+   | Anthropic | `anthropic` | `SCRIPT_API_KEY` or `ANTHROPIC_API_KEY` |
+   | Google Gemini | `google` | `SCRIPT_API_KEY` or `GOOGLE_API_KEY` |
+   | Any OpenAI-compatible endpoint | `custom` | `SCRIPT_API_KEY` + `SCRIPT_BASE_URL` |
+
+2. Optionally set `SCRIPT_MODEL`. If it is omitted the provider's default model
+   is used. If it is set to a model the credential cannot use, verification
+   reports a failure instead of silently using something else.
+3. Open **Settings → Integrations** and press **Verify Script AI now**. This
+   makes a real authenticated call to the provider and records the result;
+   only then does the capability become `connected_verified`.
+4. Open an episode and press **Generate script**. Each generation stores a new
+   immutable version. Approving one appends a decision — it never rewrites the
+   script.
+
+No key is needed for the studio to run: without one, script generation reports
+exactly which variable names are missing, and everything else keeps working.
 
 ## Deploying
 

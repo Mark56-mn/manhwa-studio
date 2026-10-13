@@ -13,6 +13,7 @@ import { healthRoutes } from './routes/health'
 import { integrationRoutes } from './routes/integrations'
 import { overviewRoutes } from './routes/overview'
 import { projectRoutes } from './routes/projects'
+import { scriptRoutes } from './routes/scripts'
 import { seasonRoutes } from './routes/seasons'
 
 import type { FreebuffUser } from '@freebuff/auth'
@@ -81,6 +82,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   app.route('/api', accountRoutes)
   app.route('/api', overviewRoutes)
   app.route('/api', projectRoutes)
+  app.route('/api', scriptRoutes)
   app.route('/api', episodeRoutes)
   app.route('/api', seasonRoutes)
   app.route('/api', characterRoutes)

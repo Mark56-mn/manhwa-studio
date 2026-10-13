@@ -20,13 +20,17 @@ project data. The roadmap below is ordered by "what unblocks the owner next".
 
 Order matters: provider choice, then artifacts, then assembly.
 
-1. **TASK-002 — provider selection + script generation.** Choose one script
-   provider, implement the adapter behind `SCRIPT_*`, store versioned scripts
-   against an episode, keep approvals from being overwritten.
-2. **TASK-003 — object storage.** Provision R2, store image/audio/video
-   artifacts with metadata rows (`assets`), never binaries in D1.
+1. **TASK-002 — provider adapters + real script generation. (done)**
+   Multi-provider adapter layer behind `SCRIPT_*` (`openai`, `openrouter`,
+   `anthropic`, `google`, `custom`), real authenticated verification recorded in
+   `provider_checks`, immutable `script_versions` with parsed `scenes`, an
+   append-only `script_approvals` review trail, and an episode workspace UI.
+   See `handoffs/HANDOFF-002-provider-and-script.md`.
+2. **TASK-003 — object storage.** Provision R2, add the `assets` table, and
+   store generated media as objects with metadata rows (never binaries in D1).
 3. **TASK-004 — image generation.** Scene + character art with continuity
-   references from the story bible; store real files, record provider/model.
+   references from the story bible and the `scenes.image_prompt` written by
+   TASK-002; store real files, record provider/model/dimensions.
 4. **TASK-005 — voice generation.** Narration audio per scene; store artifact +
    voice settings.
 5. **TASK-006 — video assembly.** Render scenes + narration + captions into a

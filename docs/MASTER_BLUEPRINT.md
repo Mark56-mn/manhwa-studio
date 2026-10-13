@@ -90,17 +90,37 @@ Trade-offs, stated honestly:
 - `characters` — approved continuity references (description + appearance).
 - `activity_events` — production history: who did what, when.
 
-Versioned artifacts (scripts, assets, jobs, worker runs, review decisions,
-uploads) arrive with the phases that create them, so no empty tables ship now.
+Versioned artifacts (assets, jobs, worker runs, uploads) arrive with the phases
+that create them, so no empty tables ship before they are used.
+
+Migration 0002 (Phase B) adds the first real production artifacts:
+
+- `script_versions` — immutable script artifacts: version per episode, provider,
+  model, the exact prompt, the raw model output, the parsed structure and an
+  honest `parse_state`. Rows are inserted, never rewritten; approving only
+  changes `status`.
+- `script_approvals` — append-only review decisions (approved / rejected /
+  changes requested) with the note and who decided.
+- `scenes` — the ordered scene breakdown of a parsed script, which the image and
+  voice stages in later tasks read.
+- `provider_checks` — the recorded result of real authenticated provider calls,
+  which is the only thing that can move a capability to `connected_verified`.
+
+Migrations are applied either by `wrangler d1 migrations apply` or by
+`POST /api/bootstrap`, which now applies whichever migrations are pending (each
+in one atomic batch) and refuses an inconsistent schema instead of guessing.
 
 ## 5. Phases
 
 - **Phase A (done, this repo):** online foundation — responsive studio,
   authentication, persistent projects/episodes, real health endpoint, honest
   integration status, deployment.
-- **Phase B (next):** first real production — script generation persisted as
-  versions, one real image, real narration audio, playable video, owner review.
-  Requires choosing providers (script/image/voice) and object storage (R2).
+- **Phase B (in progress):** first real production.
+  - TASK-002 (done): provider adapter layer (`openai`, `openrouter`,
+    `anthropic`, `google`, `custom`), real provider verification, versioned
+    scripts with append-only approvals, parsed scenes, and an episode workspace.
+  - TASK-003+ (next): object storage (R2) + `assets` rows, image generation,
+    narration audio, then video assembly and owner review.
 - **Phase C:** durable jobs, retries, timeouts, cancellation, logs, remote GPU
   worker for rendering.
 - **Phase D:** YouTube OAuth, private/unlisted test upload with verified video

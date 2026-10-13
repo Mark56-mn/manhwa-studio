@@ -42,6 +42,15 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   completed: 'Completed',
 }
 
+export const SCRIPT_VERSION_STATUSES = ['draft', 'approved', 'rejected'] as const
+export type ScriptVersionStatus = (typeof SCRIPT_VERSION_STATUSES)[number]
+
+export const PARSE_STATES = ['parsed', 'unparsed'] as const
+export type ParseState = (typeof PARSE_STATES)[number]
+
+export const REVIEW_DECISIONS = ['approved', 'rejected', 'changes_requested'] as const
+export type ReviewDecision = (typeof REVIEW_DECISIONS)[number]
+
 /** Tables the application cannot work without. Used by /api/health readiness. */
 export const REQUIRED_TABLES = [
   'users',
@@ -49,5 +58,9 @@ export const REQUIRED_TABLES = [
   'seasons',
   'episodes',
   'characters',
+  'script_versions',
+  'script_approvals',
+  'scenes',
+  'provider_checks',
   'activity_events',
 ] as const
