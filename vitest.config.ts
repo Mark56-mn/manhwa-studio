@@ -21,6 +21,12 @@ export default defineConfig(async () => {
             FREEBUFF_ISSUER: 'https://freebuff.com/oidc',
             APP_ORIGIN: 'http://localhost:8787',
             APP_VERSION: '0.1.0-test',
+            // Live-provider tests run only when these real keys are present.
+            // They are read from the developer's environment, never committed.
+            LIVE_OPENROUTER_API_KEY: process.env.LIVE_OPENROUTER_API_KEY ?? '',
+            LIVE_NVIDIA_API_KEY: process.env.LIVE_NVIDIA_API_KEY ?? '',
+            LIVE_GEMINI_API_KEY: process.env.LIVE_GEMINI_API_KEY ?? '',
+            LIVE_BASETEN_API_KEY: process.env.LIVE_BASETEN_API_KEY ?? '',
             TEST_MIGRATIONS: migrations,
           },
         },

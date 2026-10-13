@@ -1,5 +1,5 @@
 import { ProviderError } from '../providers/types'
-import { findAdapter, resolveProviderConfig } from '../providers'
+import { findAdapter, resolveProviderCredentials } from '../providers'
 import { nowIso } from '../lib/time'
 
 import type { DiscoveredModel, ModelCostPolicy, ProviderCapabilities } from '../providers/types'
@@ -70,12 +70,19 @@ export async function refreshCatalog(
 ): Promise<DiscoveredModel[]> {
   const adapter = findAdapter(providerId)
   if (!adapter) throw new ProviderError('provider_unknown', `"${providerId}" is not a known provider.`)
-  const resolved = resolveProviderConfig(env, providerId, adapter.defaultModel)
-  if (!resolved.configured || !resolved.config) {
-    throw new ProviderError('provider_not_configured', resolved.detail)
+  // Model discovery needs credentials only, never a preselected model.
+  const credentials = resolveProviderCredentials(env, providerId)
+  if (!credentials.configured || !credentials.adapter) {
+    throw new ProviderError('provider_not_configured', credentials.detail)
+  }
+  const config = {
+    provider: credentials.adapter.id,
+    apiKey: credentials.apiKey as string,
+    model: credentials.adapter.defaultModel,
+    baseUrl: credentials.baseUrl,
   }
 
-  const models = await adapter.listModels(resolved.config, signal)
+  const models = await credentials.adapter.listModels(config, signal)
   const now = nowIso()
   const statements = models.map((model) =>
     db

@@ -2,7 +2,7 @@ import { HttpError } from '../lib/errors'
 import { newId } from '../lib/ids'
 import { nowIso } from '../lib/time'
 import { AI_ROLES } from '../lib/constants'
-import { AI_ADAPTERS, providerBaseUrl, providerKey, resolveProviderConfig } from '../providers'
+import { AI_ADAPTERS, providerBaseUrl, providerKey, resolveProviderConfig, resolveProviderCredentials } from '../providers'
 import { isProviderError } from '../providers/types'
 import { cachedModels, refreshCatalog, setModelCost } from './catalog'
 import { AiRoutingError, describeCandidates } from './router'
@@ -98,18 +98,18 @@ export async function testProvider(
   model: string | null,
   checkedBy: string | null,
 ): Promise<ProviderTestResult> {
-  const resolved = resolveProviderConfig(env, providerId, model)
-  const label = resolved.adapter?.label ?? providerId
+  const credentials = resolveProviderCredentials(env, providerId)
+  const label = credentials.adapter?.label ?? providerId
   const started = Date.now()
 
-  if (!resolved.adapter || !resolved.config) {
+  const failure = async (detail: string, code: string): Promise<ProviderTestResult> => {
     const result: ProviderTestResult = {
       provider: providerId,
       providerLabel: label,
       model: model ?? '',
       ok: false,
-      detail: resolved.detail,
-      code: 'provider_not_configured',
+      detail,
+      code,
       latencyMs: Date.now() - started,
       requestId: null,
       models: [],
@@ -120,7 +120,7 @@ export async function testProvider(
       provider: providerId,
       model: model ?? null,
       status: 'failed',
-      detail: result.detail,
+      detail,
       latencyMs: result.latencyMs,
       models: [],
       checkedBy,
@@ -128,17 +128,54 @@ export async function testProvider(
     return result
   }
 
-  const config = resolved.config
+  if (!credentials.adapter || !credentials.configured) {
+    return failure(credentials.detail, 'provider_not_configured')
+  }
+
   const signal = AbortSignal.timeout(30_000)
+  const baseConfig = {
+    provider: credentials.adapter.id,
+    apiKey: credentials.apiKey as string,
+    model: (model ?? '').trim(),
+    baseUrl: credentials.baseUrl,
+  }
+
+  // A test needs a model. When none is chosen, discover one from the provider.
+  if (!baseConfig.model) {
+    try {
+      const discovered = await credentials.adapter.listModels(baseConfig, signal)
+      const free = discovered.find((entry) => entry.free === 'free')
+      baseConfig.model = (free ?? discovered[0])?.id ?? ''
+    } catch (error) {
+      // A credential/permission/availability failure is the real answer; only a
+      // plain "no model list" is treated as "nothing discovered".
+      if (
+        isProviderError(error) &&
+        ['provider_unauthorized', 'provider_forbidden', 'provider_rate_limited', 'provider_quota_exhausted', 'provider_timeout', 'provider_outage'].includes(
+          error.code,
+        )
+      ) {
+        return failure(error.message, error.code)
+      }
+    }
+    if (!baseConfig.model) {
+      return failure(
+        `${label} is configured, but no model is selected and none could be discovered. Choose a model id, then test again.`,
+        'provider_model_not_found',
+      )
+    }
+  }
+
+  const config = baseConfig
   try {
-    const completion = await resolved.adapter.chat(config, {
+    const completion = await credentials.adapter.chat(config, {
       model: config.model,
       messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
       maxOutputTokens: 16,
       temperature: 0,
       signal,
     })
-    const models = await resolved.adapter.listModels(config, signal).catch((): DiscoveredModel[] => [])
+    const models = await credentials.adapter.listModels(config, signal).catch((): DiscoveredModel[] => [])
     const result: ProviderTestResult = {
       provider: providerId,
       providerLabel: label,

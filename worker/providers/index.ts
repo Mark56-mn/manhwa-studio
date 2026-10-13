@@ -101,6 +101,10 @@ export const customAdapter = createOpenAiCompatibleAdapter({
   maxTokensField: 'max_tokens',
 })
 
+/** Re-exported so tests and the router can import every adapter from one place. */
+export { googleAdapter } from './google'
+export { anthropicAdapter } from './anthropic'
+
 export const AI_ADAPTERS: ProviderAdapter[] = [
   openRouterAdapter,
   nvidiaAdapter,
@@ -172,30 +176,31 @@ export function providerBaseUrl(env: Env, adapter: ProviderAdapter): string | nu
   return adapter.defaultBaseUrl
 }
 
-export interface ProviderConfigResolution {
-  configured: boolean
+export interface ProviderCredentials {
   adapter: ProviderAdapter | null
-  config: ProviderConfig | null
+  apiKey: string | null
+  baseUrl: string | null
+  configured: boolean
   missing: string[]
   detail: string
 }
 
 /**
- * Resolves one named provider from the deployment environment. Used by the
- * router for every candidate it tries.
+ * Resolves a provider's credentials only. Model discovery and connectivity
+ * checks need no model, so this is deliberately separate from a full config.
  */
-export function resolveProviderConfig(
+export function resolveProviderCredentials(
   env: Env,
   providerId: string | null | undefined,
-  modelOverride?: string | null,
   extraKeyEnvVars: string[] = [],
-): ProviderConfigResolution {
+): ProviderCredentials {
   const adapter = findAdapter(providerId)
   if (!adapter) {
     return {
-      configured: false,
       adapter: null,
-      config: null,
+      apiKey: null,
+      baseUrl: null,
+      configured: false,
       missing: [],
       detail: providerId
         ? `"${providerId}" is not a provider this build knows. Known providers: ${AI_ADAPTERS.map((entry) => entry.id).join(', ')}.`
@@ -205,30 +210,81 @@ export function resolveProviderConfig(
 
   const apiKey = providerKey(env, adapter, extraKeyEnvVars)
   const baseUrl = providerBaseUrl(env, adapter)
-  const model = (modelOverride ?? '').trim() || adapter.defaultModel
-
   const missing: string[] = []
   if (!apiKey) missing.push(adapter.keyEnvVars[0] ?? 'API key')
   if (adapter.needsBaseUrl && !baseUrl) missing.push(...adapter.baseUrlEnvVars)
-  if (!model) missing.push(`${adapter.id.toUpperCase()}_MODEL`)
 
   if (missing.length > 0) {
     const unique = [...new Set(missing)]
     return {
-      configured: false,
       adapter,
-      config: null,
+      apiKey: null,
+      baseUrl,
+      configured: false,
       missing: unique,
       detail: `${adapter.label} is selected but cannot be used yet. Still to set: ${unique.join(', ')}.`,
     }
   }
 
   return {
-    configured: true,
     adapter,
+    apiKey,
+    baseUrl,
+    configured: true,
     missing: [],
-    detail: `${adapter.label} · model ${model}`,
-    config: { provider: adapter.id, apiKey: apiKey as string, model, baseUrl },
+    detail: `${adapter.label} credentials are present.`,
+  }
+}
+
+export interface ProviderConfigResolution {
+  configured: boolean
+  adapter: ProviderAdapter | null
+  config: ProviderConfig | null
+  missing: string[]
+  detail: string
+}
+
+/**
+ * Resolves one named provider and a model. Used by the router for every
+ * candidate it tries; a missing model is reported, never guessed.
+ */
+export function resolveProviderConfig(
+  env: Env,
+  providerId: string | null | undefined,
+  modelOverride?: string | null,
+  extraKeyEnvVars: string[] = [],
+): ProviderConfigResolution {
+  const credentials = resolveProviderCredentials(env, providerId, extraKeyEnvVars)
+  if (!credentials.adapter) {
+    return { configured: false, adapter: null, config: null, missing: [], detail: credentials.detail }
+  }
+  if (!credentials.configured) {
+    return {
+      configured: false,
+      adapter: credentials.adapter,
+      config: null,
+      missing: credentials.missing,
+      detail: credentials.detail,
+    }
+  }
+
+  const model = (modelOverride ?? '').trim() || credentials.adapter.defaultModel
+  if (!model) {
+    return {
+      configured: false,
+      adapter: credentials.adapter,
+      config: null,
+      missing: [`${credentials.adapter.id.toUpperCase()}_MODEL`],
+      detail: `${credentials.adapter.label} is configured, but no model is selected. Discover models or enter a model id.`,
+    }
+  }
+
+  return {
+    configured: true,
+    adapter: credentials.adapter,
+    missing: [],
+    detail: `${credentials.adapter.label} · model ${model}`,
+    config: { provider: credentials.adapter.id, apiKey: credentials.apiKey as string, model, baseUrl: credentials.baseUrl },
   }
 }
 
