@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-import { sqlText } from './vite.sql-plugin'
+import { sqlText } from './vite.sql-plugin.mts'
 
 // Vite serves the studio shell during development and bundles it into ./dist
 // for deployment. API and auth requests are proxied to the local Worker so the

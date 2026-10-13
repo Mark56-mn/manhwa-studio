@@ -1,7 +1,7 @@
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers'
 import { defineConfig } from 'vitest/config'
 
-import { sqlText } from './vite.sql-plugin'
+import { sqlText } from './vite.sql-plugin.mts'
 
 // Tests execute inside workerd (the real Workers runtime) against a real D1
 // database created from ./migrations by test/setup.ts.
