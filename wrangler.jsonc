@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "manhwa-studio",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": false,
+  // Migrations are bundled as text so the Worker can initialize an empty D1.
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application"
+  },
+  // Public configuration only. There are no secrets in this project yet:
+  // Sign in with Freebuff needs no client secret, and no AI provider is
+  // configured in Phase A. Values below are the *development* client.
+  "vars": {
+    "FREEBUFF_CLIENT_ID": "5db60f86-fbc0-483f-8d33-af315f983a34",
+    "FREEBUFF_ISSUER": "https://freebuff.com/oidc",
+    "APP_ORIGIN": "http://localhost:8787",
+    "APP_VERSION": "0.1.0"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "manhwa-studio",
+      "database_id": "local-dev-only",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true }
+}

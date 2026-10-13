@@ -1,0 +1,50 @@
+# Roadmap
+
+Phase A is complete: the studio is online, authenticated, and persists real
+project data. The roadmap below is ordered by "what unblocks the owner next".
+
+## Phase A — online foundation (complete)
+
+- [x] Responsive studio shell, dark blue/violet theme, usable on a phone.
+- [x] Sign in with Freebuff, enforced on the server for every private route.
+- [x] Project create/list/detail/edit/delete, persisted in D1.
+- [x] Seasons, episodes (auto-numbered, staged status), characters, story bible.
+- [x] Production history feed recording real actions.
+- [x] `/api/health` readiness from real checks (database, assets, auth config).
+- [x] `/api/integrations` honest capability status.
+- [x] SQL migration + documented apply steps.
+- [x] Tests: API/authorization/CSRF integration specs against real D1 in workerd.
+- [x] Deployment on one origin with preview/production environments.
+
+## Phase B — first real production (next)
+
+Order matters: provider choice, then artifacts, then assembly.
+
+1. **TASK-002 — provider selection + script generation.** Choose one script
+   provider, implement the adapter behind `SCRIPT_*`, store versioned scripts
+   against an episode, keep approvals from being overwritten.
+2. **TASK-003 — object storage.** Provision R2, store image/audio/video
+   artifacts with metadata rows (`assets`), never binaries in D1.
+3. **TASK-004 — image generation.** Scene + character art with continuity
+   references from the story bible; store real files, record provider/model.
+4. **TASK-005 — voice generation.** Narration audio per scene; store artifact +
+   voice settings.
+5. **TASK-006 — video assembly.** Render scenes + narration + captions into a
+   playable file; validate with media tools; owner plays it before approval.
+
+## Phase C — reliable automation
+
+Durable job queue with retries/timeouts/cancellation, director task graph with
+dependencies, worker run logs, remote GPU/notebook render worker, and recovery
+after a worker disconnects.
+
+## Phase D — publishing
+
+YouTube OAuth, private/unlisted upload, verified video id + processing status,
+per-episode approval record, public publication only after explicit
+authorisation.
+
+## Phase E — polish
+
+Editing tools, continuity checking, character consistency scoring, scheduling,
+analytics, advanced automation.
