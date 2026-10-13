@@ -300,3 +300,136 @@ export function fieldErrors(error: unknown): string[] {
     })
     .filter((line) => line.length > 0)
 }
+
+// ---- Unified AI provider adapter + task router (TASK-003) -----------------
+
+export type AiRole = 'director' | 'script'
+
+export interface AiProviderCapabilities {
+  streaming: boolean
+  structuredOutput: 'json_schema' | 'json_object' | 'none'
+  tools: boolean
+  vision: boolean
+}
+
+export interface AiProviderModel {
+  id: string
+  free: 'free' | 'paid' | 'unknown' | string
+  contextLength: number | null
+}
+
+export interface AiProvider {
+  id: string
+  label: string
+  docsUrl: string
+  implemented: boolean
+  baseUrl: string | null
+  keyEnvVars: string[]
+  baseUrlEnvVars: string[]
+  configured: boolean
+  state: IntegrationState
+  detail: string
+  capabilities: AiProviderCapabilities
+  defaultModel: string
+  models: AiProviderModel[]
+  lastTestAt: string | null
+  lastTest: { status: string; detail: string; latencyMs: number | null; model: string | null } | null
+}
+
+export interface AiFallback {
+  provider: string
+  model: string | null
+}
+
+export interface AiRoleSetting {
+  role: AiRole
+  provider: string | null
+  model: string | null
+  allowPaid: boolean
+  fallbacks: AiFallback[]
+  updatedAt: string | null
+}
+
+export interface AiProvidersResponse {
+  providers: AiProvider[]
+  secretsPolicy: { detail: string; envVarNamesOnly: boolean }
+  costPolicy: { detail: string }
+}
+
+export interface AiSettingsResponse {
+  roles: AiRoleSetting[]
+  providers: AiProvider[]
+  secretsPolicy: { detail: string; envVarNamesOnly: boolean }
+  costPolicy: { detail: string }
+}
+
+export interface AiRouterRole {
+  role: AiRole
+  provider: string | null
+  model: string | null
+  allowPaid: boolean
+  candidates: Array<{ provider: string; model: string; source: string }>
+  detail: string
+  missing: string[]
+}
+
+export interface AiRouterStatus {
+  roles: AiRouterRole[]
+  lastActive: { provider: string; model: string | null; task: string; at: string } | null
+  recentFailures: Array<{
+    provider: string
+    model: string | null
+    task: string
+    errorCode: string | null
+    detail: string
+    at: string
+  }>
+  cooldowns: Array<{ provider: string; model: string; until: string; reason: string | null }>
+}
+
+export interface AiProviderTestResult {
+  provider: string
+  providerLabel: string
+  model: string
+  ok: boolean
+  detail: string
+  code: string | null
+  latencyMs: number
+  requestId: string | null
+  models: string[]
+  checkedAt: string
+}
+
+export interface DirectorPlanBeat {
+  index: number
+  summary: string
+  sceneIntent: string
+  characters: string[]
+  emotionalBeat: string
+}
+
+export interface DirectorPlanBody {
+  title: string
+  objective: string
+  beats: DirectorPlanBeat[]
+  sceneCount: number | null
+  imageNotes: string
+  voiceNotes: string
+  continuityWatch: string[]
+}
+
+export interface DirectorPlan {
+  id: string
+  episodeId: string
+  version: number
+  provider: string
+  model: string
+  parseState: 'parsed' | 'unparsed'
+  parseDetail: string | null
+  inputTokens: number | null
+  outputTokens: number | null
+  createdAt: string
+  rawText?: string
+  plan?: DirectorPlanBody | null
+}
+

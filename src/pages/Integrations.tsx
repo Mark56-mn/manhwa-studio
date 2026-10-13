@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 
 import { Button, Card, ErrorNote, IntegrationStatePill, Pill, Prompt, Spinner } from '../components/ui'
 import { api, fetchHealth } from '../lib/api'
+import { AiProviders } from '../components/AiProviders'
 import { relativeTime, titleCase } from '../lib/format'
 import { useResource } from '../lib/useResource'
 
@@ -150,6 +151,8 @@ export function Integrations({ user }: { user: User }) {
           ))}
         </ul>
       </Card>
+
+      <AiProviders />
 
       <Card title="Secrets policy" subtitle="How provider keys are handled">
         <ul className="bullets">

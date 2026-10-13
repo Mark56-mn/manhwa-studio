@@ -15,6 +15,21 @@ import type { AppBindings } from '../app'
 
 export const aiRoutes = new Hono<AppBindings>()
 
+/** Policy text shared by the provider and settings responses. */
+function policyInfo() {
+  return {
+    secretsPolicy: {
+      detail:
+        'Provider keys are deployment secrets (environment variables). They are never sent to the browser, never logged, and never stored in the database.',
+      envVarNamesOnly: true,
+    },
+    costPolicy: {
+      detail:
+        'Free-only by default. A model is eligible for automatic failover only when it is verified zero-cost, unless paid use is explicitly authorised for the role.',
+    },
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -38,15 +53,7 @@ aiRoutes.get('/ai/providers', async (c) => {
   return c.json({
     providers: await providerStatuses(c.env.DB, c.env),
     adapters: describeAdapters(),
-    secretsPolicy: {
-      detail:
-        'Provider keys are deployment secrets (environment variables). They are never sent to the browser, never logged, and never stored in the database.',
-      envVarNamesOnly: true,
-    },
-    costPolicy: {
-      detail:
-        'Free-only by default. A model is eligible for automatic failover only when it is verified zero-cost, unless paid use is explicitly authorised for the role.',
-    },
+    ...policyInfo(),
   })
 })
 
@@ -124,7 +131,7 @@ aiRoutes.get('/ai/settings', async (c) => {
       }
     }),
   )
-  return c.json({ roles, providers: await providerStatuses(c.env.DB, c.env) })
+  return c.json({ roles, providers: await providerStatuses(c.env.DB, c.env), ...policyInfo() })
 })
 
 aiRoutes.put('/ai/settings', async (c) => {

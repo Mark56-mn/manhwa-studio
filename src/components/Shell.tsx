@@ -81,9 +81,9 @@ export function Shell({
           </button>
         ))}
         <p className="nav-foot">
-          Phase A · online foundation
+          Phase B · real script + Director AI
           <br />
-          Script, art, voice and video workers arrive next.
+          Art, voice and video workers arrive next.
         </p>
       </nav>
 

@@ -21,6 +21,7 @@ import { useResource } from '../lib/useResource'
 
 import type {
   Capability,
+  DirectorPlan,
   EpisodeDetail,
   ReviewDecision,
   ScriptDetail,
@@ -40,6 +41,12 @@ export function EpisodeWorkspace({ episodeId, navigate }: { episodeId: string; n
   const detail = useResource(useCallback(() => api<EpisodeDetail>(`/api/episodes/${episodeId}`), [episodeId]))
   const scripts = useResource(useCallback(() => api<ScriptList>(`/api/episodes/${episodeId}/scripts`), [episodeId]))
   const integrations = useResource(useCallback(() => api<{ capabilities: Capability[] }>('/api/integrations'), []))
+  const plans = useResource(
+    useCallback(
+      () => api<{ episodeId: string; plans: DirectorPlan[] }>(`/api/episodes/${episodeId}/director/plans`),
+      [episodeId],
+    ),
+  )
 
   const [pickedId, setPickedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<ScriptDetail | null>(null)
@@ -49,6 +56,9 @@ export function EpisodeWorkspace({ episodeId, navigate }: { episodeId: string; n
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [plan, setPlan] = useState<DirectorPlan | null>(null)
+  const [planInstructions, setPlanInstructions] = useState('')
+  const [planning, setPlanning] = useState(false)
 
   const versions: ScriptSummary[] = scripts.data?.scripts ?? []
   const scriptCapability = integrations.data?.capabilities.find((capability) => capability.id === 'script') ?? null
@@ -104,6 +114,30 @@ export function EpisodeWorkspace({ episodeId, navigate }: { episodeId: string; n
       setError(describe(cause))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function runDirector() {
+    setPlanning(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const created = await api<{ plan: DirectorPlan; providerLabel: string; failovers: number }>(
+        `/api/episodes/${episodeId}/director/plan`,
+        { method: 'POST', body: JSON.stringify({ instructions: planInstructions }) },
+      )
+      setPlan(created.plan)
+      setPlanInstructions('')
+      await Promise.all([plans.reload(), detail.reload()])
+      setNotice(
+        `Director AI (${created.plan.provider} · ${created.plan.model}) produced plan v${created.plan.version}${
+          created.failovers > 0 ? ` after ${created.failovers} failover(s)` : ''
+        }.`,
+      )
+    } catch (cause) {
+      setError(describe(cause))
+    } finally {
+      setPlanning(false)
     }
   }
 
@@ -168,6 +202,49 @@ export function EpisodeWorkspace({ episodeId, navigate }: { episodeId: string; n
       {notice && <p className="note note-ok">{notice}</p>}
 
       <ScriptCapabilityBanner capability={scriptCapability} onOpenSettings={() => navigate('/integrations')} />
+
+      <Card
+        title="Director AI"
+        subtitle="Plans the episode into beats before the script is written. Runs through the same provider router."
+      >
+        <div className="form">
+          <Label text="Direction for the plan (optional)">
+            <TextArea
+              rows={2}
+              value={planInstructions}
+              maxLength={4000}
+              placeholder="Keep this episode focused on the rooftop reunion."
+              onChange={(event) => setPlanInstructions(event.target.value)}
+            />
+          </Label>
+          <div className="form-actions">
+            <Button type="button" disabled={planning} onClick={() => void runDirector()}>
+              {planning ? 'Planning…' : 'Plan with Director AI'}
+            </Button>
+            <span className="hint">
+              {plans.data?.plans.length ? `${plans.data.plans.length} plan version(s) stored.` : 'No plan yet.'}
+            </span>
+          </div>
+        </div>
+        {plan && (
+          <div className="stack">
+            <p className="hint mono">
+              v{plan.version} · {plan.provider} · {plan.model} · {plan.parseState}
+            </p>
+            {plan.plan?.objective && <p className="prompt">{plan.plan.objective}</p>}
+            <ol className="bullets">
+              {(plan.plan?.beats ?? []).map((beat) => (
+                <li key={beat.index}>
+                  <strong>Beat {beat.index}:</strong> {beat.summary}
+                  {beat.sceneIntent ? ` — ${beat.sceneIntent}` : ''}
+                  {beat.characters.length > 0 ? ` (${beat.characters.join(', ')})` : ''}
+                </li>
+              ))}
+            </ol>
+            {plan.parseState === 'unparsed' && <ErrorNote>{plan.parseDetail ?? 'The plan could not be parsed.'}</ErrorNote>}
+          </div>
+        )}
+      </Card>
 
       <Card
         title="Script AI"
