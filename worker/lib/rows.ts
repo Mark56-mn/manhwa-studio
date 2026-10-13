@@ -213,6 +213,24 @@ export interface ProviderCheckRow {
   checked_at: string
 }
 
+export interface DirectorPlanRow {
+  id: string
+  episode_id: string
+  project_id: string
+  version: number
+  provider: string
+  model: string
+  raw_text: string
+  plan_json: string | null
+  parse_state: ParseState
+  parse_detail: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  created_by: string
+  created_at: string
+}
+
+
 function parseJson(value: string | null): unknown {
   if (!value) return null
   try {
@@ -275,6 +293,7 @@ export function serializeScriptApproval(row: ScriptApprovalRow) {
     id: row.id,
     scriptId: row.script_id,
     decision: row.decision,
+
     note: row.note,
     decidedBy: row.decided_by,
     createdAt: row.created_at,
@@ -293,5 +312,22 @@ export function serializeProviderCheck(row: ProviderCheckRow) {
     models: Array.isArray(models) ? (models as string[]) : [],
     checkedBy: row.checked_by,
     checkedAt: row.checked_at,
+  }
+}
+
+export function serializeDirectorPlan(row: DirectorPlanRow, includeBody = true) {
+  return {
+    id: row.id,
+    episodeId: row.episode_id,
+    version: row.version,
+    provider: row.provider,
+    model: row.model,
+    parseState: row.parse_state,
+    parseDetail: row.parse_detail,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    ...(includeBody ? { rawText: row.raw_text, plan: parseJson(row.plan_json) } : {}),
   }
 }

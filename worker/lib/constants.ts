@@ -51,6 +51,15 @@ export type ParseState = (typeof PARSE_STATES)[number]
 export const REVIEW_DECISIONS = ['approved', 'rejected', 'changes_requested'] as const
 export type ReviewDecision = (typeof REVIEW_DECISIONS)[number]
 
+/** Roles the AI task router serves. Each role picks its own provider/model. */
+export const AI_ROLES = ['director', 'script'] as const
+export type AiRole = (typeof AI_ROLES)[number]
+
+/** Tasks the router knows how to run. */
+export const AI_TASKS = ['script', 'director_plan', 'connectivity'] as const
+export type AiTask = (typeof AI_TASKS)[number]
+
+
 /** Tables the application cannot work without. Used by /api/health readiness. */
 export const REQUIRED_TABLES = [
   'users',
@@ -62,5 +71,10 @@ export const REQUIRED_TABLES = [
   'script_approvals',
   'scenes',
   'provider_checks',
+  'ai_settings',
+  'ai_model_catalog',
+  'ai_provider_state',
+  'ai_route_events',
+  'director_plans',
   'activity_events',
 ] as const

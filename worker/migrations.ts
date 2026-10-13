@@ -1,6 +1,7 @@
 import { REQUIRED_TABLES } from './lib/constants'
 import initSql from '../migrations/0001_init.sql'
 import phaseBSql from '../migrations/0002_phase_b_scripts.sql'
+import aiRouterSql from '../migrations/0003_ai_router.sql'
 
 export interface Migration {
   /** Recorded in d1_migrations, matching what `wrangler d1 migrations` writes. */
@@ -12,6 +13,7 @@ export interface Migration {
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init.sql', sql: initSql },
   { name: '0002_phase_b_scripts.sql', sql: phaseBSql },
+  { name: '0003_ai_router.sql', sql: aiRouterSql },
 ]
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]?.name ?? 'none'

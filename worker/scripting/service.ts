@@ -3,8 +3,9 @@ import { HttpError } from '../lib/errors'
 import { newId } from '../lib/ids'
 import { buildScriptPrompt } from './prompt'
 import { parseScriptText } from './parse'
-import { SCRIPT_ADAPTERS, readEnvValue, resolveScriptConfig } from '../providers'
-import { isProviderError } from '../providers/types'
+import { findAdapter, readEnvValue } from '../providers'
+import { runAiTask } from '../ai/router'
+import { routingHttpError } from '../ai/service'
 import { nowIso } from '../lib/time'
 
 import type { ParsedScript } from './parse'
@@ -37,19 +38,9 @@ export function resolveMaxOutputTokens(env: Env): number {
   return clamp(parsed, MIN_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS)
 }
 
-/** Maps a provider failure onto an HTTP status the studio can report honestly. */
+/** Maps a router/provider failure onto an HTTP status the studio can report. */
 export function providerHttpError(error: unknown, provider: string): HttpError {
-  if (isProviderError(error)) {
-    const status =
-      error.code === 'provider_timeout' ? 504 : error.code === 'provider_not_configured' ? 503 : 502
-    return new HttpError(status, error.message, error.code, { provider })
-  }
-  return new HttpError(
-    502,
-    `The provider call failed: ${error instanceof Error ? error.message : 'unknown error'}`,
-    'provider_http_error',
-    { provider },
-  )
+  return routingHttpError(error, provider)
 }
 
 export interface GenerateScriptParams {
@@ -112,14 +103,6 @@ export async function generateEpisodeScript(
 ): Promise<GenerateScriptOutcome> {
   const { episode, project, season, characters } = await loadContext(db, params.episodeId, params.ownerId)
 
-  const resolved = resolveScriptConfig(env)
-  if (!resolved.configured || !resolved.adapter || !resolved.config) {
-    throw new HttpError(503, resolved.detail, 'provider_not_configured', {
-      missingEnvVars: resolved.missing,
-      supportedProviders: SCRIPT_ADAPTERS.map((adapter) => adapter.id),
-    })
-  }
-
   const { system, prompt } = buildScriptPrompt({
     project,
     episode,
@@ -131,16 +114,32 @@ export async function generateEpisodeScript(
 
   const maxOutputTokens = resolveMaxOutputTokens(env)
   const temperature = clamp(params.temperature, 0, 2)
+  const taskId = newId('task')
 
+  // The router chooses and fails over the provider/model. The script artifact
+  // stores the raw answer plus an honest parse_state, so a non-JSON answer is
+  // still a real, stored artifact rather than a fabricated success.
   let result
   try {
-    result = await resolved.adapter.generate(
-      resolved.config,
-      { system, prompt, maxOutputTokens, temperature, signal: AbortSignal.timeout(180_000) },
-    )
+    result = await runAiTask(env, db, {
+      role: 'script',
+      task: 'script',
+      ownerId: params.ownerId,
+      taskId,
+      requirements: { structured: false, tools: false, streaming: false, minContext: null },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
+      temperature,
+      maxOutputTokens,
+      validate: () => ({ ok: true, detail: 'stored verbatim; parse_state records whether it parsed' }),
+    })
   } catch (error) {
-    throw providerHttpError(error, resolved.adapter.id)
+    throw routingHttpError(error, 'script')
   }
+
+  const providerLabel = findAdapter(result.provider)?.label ?? result.provider
 
   const outcome = parseScriptText(result.text)
   const parsedScript: ParsedScript | null = outcome.ok ? outcome.script : null
@@ -156,8 +155,8 @@ export async function generateEpisodeScript(
     project_id: project.id,
     version,
     status: 'draft',
-    provider: resolved.adapter.id,
-    model: result.model || resolved.config.model,
+    provider: result.provider,
+    model: result.model,
     instructions: params.instructions.slice(0, MAX_INSTRUCTIONS),
     prompt_json: JSON.stringify({ system, prompt, maxOutputTokens, temperature }),
     raw_text: result.text,
@@ -245,16 +244,16 @@ export async function generateEpisodeScript(
       500,
       `The script was generated but could not be saved: ${error instanceof Error ? error.message : 'unknown error'}`,
       'script_not_saved',
-      { provider: resolved.adapter.id, model: scriptRow.model },
+      { provider: result.provider, model: scriptRow.model },
     )
   }
 
   await logActivity(db, {
     projectId: project.id,
     actorType: 'agent',
-    actorId: resolved.adapter.id,
+    actorId: result.provider,
     eventType: 'script.generated',
-    summary: `Script AI (${resolved.adapter.label}, ${scriptRow.model}) produced script v${version} for episode ${episode.episode_number}: ${sceneRows.length} scene(s), ${
+    summary: `Script AI (${providerLabel}, ${scriptRow.model}) produced script v${version} for episode ${episode.episode_number}: ${sceneRows.length} scene(s), ${
       parsedScript ? 'parsed' : 'stored unparsed'
     }.`,
     metadata: {
@@ -273,7 +272,7 @@ export async function generateEpisodeScript(
   return {
     script: scriptRow,
     scenes: sceneRows,
-    providerLabel: resolved.adapter.label,
+    providerLabel,
     parseState: scriptRow.parse_state,
     parseDetail: parseDetail,
   }

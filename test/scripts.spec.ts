@@ -194,9 +194,11 @@ describe('script generation', () => {
     installFetch(chatOnly('You exceeded your current quota', 429))
 
     const response = await generate(AUTHOR, episode.id)
-    expect(response.status).toBe(502)
+    // A quota/rate-limit failure is now reported with its precise code and a
+    // 429 status, with the provider's own message preserved.
+    expect(response.status).toBe(429)
     const body = await json<{ code: string; error: string }>(response)
-    expect(body.code).toBe('provider_http_error')
+    expect(body.code).toBe('provider_quota_exhausted')
     expect(body.error).toContain('quota')
 
     const versions = await json<{ scripts: ScriptSummaryShape[] }>(await call(AUTHOR, `/api/episodes/${episode.id}/scripts`))
