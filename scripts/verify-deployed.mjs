@@ -78,8 +78,8 @@ async function main() {
   equal('assets state', 'connected_verified', report.checks.assets.state)
   equal('migrations applied', true, report.migrations.applied)
   check(
-    'Phase B migration recorded',
-    (report.migrations.recorded ?? []).includes('0002_phase_b_scripts.sql'),
+    'AI router migration recorded',
+    (report.migrations.recorded ?? []).includes('0003_ai_router.sql'),
     JSON.stringify(report.migrations.recorded),
   )
   check(

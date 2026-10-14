@@ -75,7 +75,11 @@ Trade-offs, stated honestly:
 3. **State changes are same-origin only** (CSRF), and personalized responses are
    `Cache-Control: private, no-store`.
 4. **Secrets live in the deployment**, never in git, never in the browser bundle.
-5. **YouTube stays private/unlisted and disabled** until the owner authorises
+5. **Free use is never assumed.** A model is eligible for automatic failover
+   only when it is verified zero-cost, unless the owner explicitly authorises
+   paid use for that role. A paid model is never chosen silently, and a provider
+   is never shown as "online" because a key merely exists.
+6. **YouTube stays private/unlisted and disabled** until the owner authorises
    publication.
 6. **Honest status vocabulary**, used consistently everywhere:
    `connected_verified`, `configured_unverified`, `unavailable`,
@@ -106,6 +110,18 @@ Migration 0002 (Phase B) adds the first real production artifacts:
 - `provider_checks` — the recorded result of real authenticated provider calls,
   which is the only thing that can move a capability to `connected_verified`.
 
+Migration 0003 (Phase B, TASK-003) adds the AI router's state:
+
+- `ai_settings` — per-owner, per-role (Director AI / Script AI) preferred
+  provider and model, an ordered fallback list, and the paid-use switch.
+- `ai_model_catalog` — models discovered from each provider's own endpoint, with
+  a cost policy that is only `free` when the provider's metadata says zero cost.
+- `ai_provider_state` — per provider/model health (circuit breaker, cooldown) and
+  the capabilities a real probe actually confirmed.
+- `ai_route_events` — the sanitized routing log: which model was tried, why it
+  was skipped, and which one completed the task. No keys, no story content.
+- `director_plans` — immutable Director AI plan versions per episode.
+
 Migrations are applied either by `wrangler d1 migrations apply` or by
 `POST /api/bootstrap`, which now applies whichever migrations are pending (each
 in one atomic batch) and refuses an inconsistent schema instead of guessing.
@@ -119,7 +135,11 @@ in one atomic batch) and refuses an inconsistent schema instead of guessing.
   - TASK-002 (done): provider adapter layer (`openai`, `openrouter`,
     `anthropic`, `google`, `custom`), real provider verification, versioned
     scripts with append-only approvals, parsed scenes, and an episode workspace.
-  - TASK-003+ (next): object storage (R2) + `assets` rows, image generation,
+  - TASK-003 (done): the unified AI provider adapter (OpenRouter, NVIDIA NIM,
+    Google Gemini, Baseten, plus OpenAI/Anthropic/custom) and a central AI task
+    router with automatic failover, circuit breakers, free-budget protection and
+    per-role Director/Script settings.
+  - TASK-004+ (next): object storage (R2) + `assets` rows, image generation,
     narration audio, then video assembly and owner review.
 - **Phase C:** durable jobs, retries, timeouts, cancellation, logs, remote GPU
   worker for rendering.

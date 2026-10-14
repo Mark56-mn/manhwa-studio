@@ -102,10 +102,10 @@ async function main() {
     const beforeBody = await before.json()
     equal('status', 'degraded', beforeBody.status)
     equal('database state', 'failed', beforeBody.checks.database.state)
-    equal('required tables missing', 10, (beforeBody.checks.database.missing ?? []).length)
+    equal('required tables missing', 15, (beforeBody.checks.database.missing ?? []).length)
     equal(
       'pending migrations named',
-      '0001_init.sql,0002_phase_b_scripts.sql',
+      '0001_init.sql,0002_phase_b_scripts.sql,0003_ai_router.sql',
       (beforeBody.migrations.pending ?? []).join(','),
     )
 
@@ -114,7 +114,7 @@ async function main() {
     equal('POST /api/bootstrap status', 200, boot.status)
     const bootBody = await boot.json()
     equal('bootstrap status', 'initialized', bootBody.status)
-    equal('applied migrations', '0001_init.sql,0002_phase_b_scripts.sql', (bootBody.applied ?? []).join(','))
+    equal('applied migrations', '0001_init.sql,0002_phase_b_scripts.sql,0003_ai_router.sql', (bootBody.applied ?? []).join(','))
 
     const after = await get('/api/health')
     equal('GET /api/health status', 200, after.status)
@@ -148,6 +148,10 @@ async function main() {
       '/api/activity',
       '/api/episodes/ep_unknown/scripts',
       '/api/scripts/scr_unknown',
+      '/api/ai/providers',
+      '/api/ai/settings',
+      '/api/ai/router',
+      '/api/episodes/ep_unknown/director/plans',
     ]
     for (const path of privatePaths) {
       const response = await get(path)
@@ -155,7 +159,12 @@ async function main() {
       equal(`GET ${path} cache-control`, 'private, no-store', response.headers.get('cache-control') ?? '')
     }
 
-    const postPaths = ['/api/episodes/ep_unknown/scripts', '/api/scripts/scr_unknown/approve']
+    const postPaths = [
+      '/api/episodes/ep_unknown/scripts',
+      '/api/scripts/scr_unknown/approve',
+      '/api/episodes/ep_unknown/director/plan',
+      '/api/ai/providers/openrouter/test',
+    ]
     for (const path of postPaths) {
       const foreign = await get(path, {
         method: 'POST',

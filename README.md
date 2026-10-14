@@ -22,7 +22,11 @@ connected yet — see "What is not built yet".
 | Health & readiness endpoint `/api/health` | Working, queries the database |
 | Integration status per capability | Honest: reports "not configured" |
 | One-shot database initialization (`POST /api/bootstrap`) | Working, guarded |
-| AI script / image / voice / video workers | **Not built (Phase B/C)** |
+| Director AI (episode planning) | Working through the AI task router |
+| Script AI (versioned script generation) | Working through the AI task router |
+| Unified AI providers: OpenRouter, NVIDIA NIM, Google Gemini, Baseten, OpenAI, Anthropic, custom | Adapters + router implemented; live only when a key is set |
+| Per-provider connection tests, model discovery, capability probes | Working (real low-token calls) |
+| Image / voice / video workers | **Not built (Phase B/C)** |
 | YouTube publishing | **Not built (Phase D)** |
 
 ## Architecture (and why)
@@ -93,40 +97,58 @@ npm run verify       # all of the above
 | `FREEBUFF_ISSUER` | OIDC issuer (`https://freebuff.com/oidc`) | same |
 | `APP_ORIGIN` | Canonical site origin, used for callbacks and CSRF | same |
 | `APP_VERSION` | Shown by `/api/health` | same |
-| `SCRIPT_PROVIDER`, `SCRIPT_API_KEY`, `SCRIPT_MODEL`, `SCRIPT_BASE_URL`, `SCRIPT_MAX_OUTPUT_TOKENS` | **Script AI (implemented, Phase B)** | Set as deployment secrets to enable script generation |
+| `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, `GEMINI_API_KEY`, `BASETEN_API_KEY` (+ optional `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `CUSTOM_API_KEY`) | Provider keys for the unified adapter | Set as deployment secrets |
+| `OPENROUTER_BASE_URL`, `NVIDIA_BASE_URL`, `BASETEN_BASE_URL`, `GEMINI_BASE_URL` | Override a provider endpoint | Optional; sensible defaults are built in |
+| `DIRECTOR_PROVIDER`, `DIRECTOR_MODEL`, `SCRIPT_PROVIDER`, `SCRIPT_MODEL`, `SCRIPT_API_KEY` | Default role choices / legacy single-provider config | Optional; the Settings UI stores per-role choices in the database |
+| `AI_ALLOW_PAID`, `AI_MAX_ATTEMPTS`, `AI_TASK_TIMEOUT_MS`, `SCRIPT_MAX_OUTPUT_TOKENS` | Router safety limits | Optional |
 | `IMAGE_*`, `VOICE_*`, `RENDER_*`, `YOUTUBE_*` | Later phases — no adapter in this build | Not read; the studio reports them honestly as not built |
 
 There are **no secrets in this repository**, and there is no client secret for
 sign-in. Provider API keys, when they exist, go into the deployment's secret
 store (never into the repo, never into the browser).
 
-### Enabling Script AI (Phase B)
+### Enabling the AI providers (Phase B)
 
-1. Pick a provider and set its variables as **deployment secrets**
-   (Sites → Secrets, or `wrangler secret put` when deploying with wrangler):
+The studio speaks one internal request shape and translates it to each provider's
+real API. Providers are interchangeable: Director AI and Script AI each choose
+their own provider and model, and the **AI task router** fails over to another
+compatible model when one fails.
 
-   | Provider | `SCRIPT_PROVIDER` | Key variable |
+1. Set any of these as **deployment secrets** (Sites → Secrets, or
+   `wrangler secret put` when deploying with wrangler). Each adapter reads only
+   its own key:
+
+   | Provider | Endpoint | Key variable |
    | --- | --- | --- |
-   | OpenAI | `openai` | `SCRIPT_API_KEY` or `OPENAI_API_KEY` |
-   | OpenRouter | `openrouter` | `SCRIPT_API_KEY` or `OPENROUTER_API_KEY` |
-   | Anthropic | `anthropic` | `SCRIPT_API_KEY` or `ANTHROPIC_API_KEY` |
-   | Google Gemini | `google` | `SCRIPT_API_KEY` or `GOOGLE_API_KEY` |
-   | Any OpenAI-compatible endpoint | `custom` | `SCRIPT_API_KEY` + `SCRIPT_BASE_URL` |
+   | OpenRouter | `https://openrouter.ai/api/v1` + `/chat/completions` | `OPENROUTER_API_KEY` |
+   | NVIDIA NIM | `https://integrate.api.nvidia.com/v1` + `/chat/completions` | `NVIDIA_API_KEY` |
+   | Google Gemini | official Generative Language API (`generateContent`) | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) |
+   | Baseten | `https://inference.baseten.co/v1` + `/chat/completions` | `BASETEN_API_KEY` |
+   | OpenAI / Anthropic / custom | provider-native | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `CUSTOM_API_KEY` |
 
-2. Optionally set `SCRIPT_MODEL`. If it is omitted the provider's default model
-   is used. If it is set to a model the credential cannot use, verification
-   reports a failure instead of silently using something else.
-3. Open **Settings → Integrations** and press **Verify Script AI now**. This
-   makes a real authenticated call to the provider and records the result;
-   only then does the capability become `connected_verified`.
-4. Open an episode and press **Generate script**. Each generation stores a new
-   immutable version. Approving one appends a decision — it never rewrites the
-   script.
+2. Open **Settings → Integrations → AI providers**. Every provider shows its
+   configuration state, the variable *names* it reads (never values), the base
+   URL, and the last connection-test time. Press **Test connection** to make a
+   real low-token request; only then does a provider become `connected_verified`.
+   Press **Discover models** to read the provider's own model list, and mark a
+   model **zero-cost** once you have verified it is free for your account.
+3. Choose separate **Director AI** and **Script AI** providers/models, add an
+   optional fallback order, and decide whether that role may use a paid model.
+4. Open an episode: **Plan with Director AI** produces a validated plan, and
+   **Generate script** produces a new immutable script version. The exact
+   provider/model that completed each task is recorded.
 
-No key is needed for the studio to run: without one, script generation reports
-exactly which variable names are missing, and everything else keeps working.
+**Cost safety.** Free use is never assumed. The router is free-only by default:
+a fallback is used only when the model is verified zero-cost, unless you
+explicitly allow paid use for that role. A provider is never shown as "online"
+just because a key exists.
+
+No key is needed for the studio to run: without one, `/api/ai/providers` reports
+`not_configured` for every provider, task requests name the exact variable that
+is missing, and everything else keeps working.
 
 ## Deploying
+
 
 This project is deployed from the workspace as a prebuilt Worker plus static
 assets:
