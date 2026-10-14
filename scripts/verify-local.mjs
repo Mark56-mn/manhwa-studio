@@ -102,10 +102,10 @@ async function main() {
     const beforeBody = await before.json()
     equal('status', 'degraded', beforeBody.status)
     equal('database state', 'failed', beforeBody.checks.database.state)
-    equal('required tables missing', 15, (beforeBody.checks.database.missing ?? []).length)
+    equal('required tables missing', 16, (beforeBody.checks.database.missing ?? []).length)
     equal(
       'pending migrations named',
-      '0001_init.sql,0002_phase_b_scripts.sql,0003_ai_router.sql',
+      '0001_init.sql,0002_phase_b_scripts.sql,0003_ai_router.sql,0004_assets.sql',
       (beforeBody.migrations.pending ?? []).join(','),
     )
 
@@ -114,7 +114,7 @@ async function main() {
     equal('POST /api/bootstrap status', 200, boot.status)
     const bootBody = await boot.json()
     equal('bootstrap status', 'initialized', bootBody.status)
-    equal('applied migrations', '0001_init.sql,0002_phase_b_scripts.sql,0003_ai_router.sql', (bootBody.applied ?? []).join(','))
+    equal('applied migrations', '0001_init.sql,0002_phase_b_scripts.sql,0003_ai_router.sql,0004_assets.sql', (bootBody.applied ?? []).join(','))
 
     const after = await get('/api/health')
     equal('GET /api/health status', 200, after.status)
@@ -123,8 +123,8 @@ async function main() {
     equal('database state', 'connected_verified', afterBody.checks.database.state)
     equal('migrations applied flag', true, afterBody.migrations.applied)
     check(
-      'media storage is reported as not attached',
-      afterBody.checks.mediaStorage.state === 'not_configured',
+      'media storage is attached but not yet verified',
+      afterBody.checks.mediaStorage.state === 'configured_unverified',
       afterBody.checks.mediaStorage.state,
     )
 
@@ -152,6 +152,10 @@ async function main() {
       '/api/ai/settings',
       '/api/ai/router',
       '/api/episodes/ep_unknown/director/plans',
+      '/api/projects/prj_unknown/assets',
+      '/api/assets/ast_unknown',
+      '/api/assets/ast_unknown/content',
+      '/api/episodes/ep_unknown/assets',
     ]
     for (const path of privatePaths) {
       const response = await get(path)
@@ -164,6 +168,7 @@ async function main() {
       '/api/scripts/scr_unknown/approve',
       '/api/episodes/ep_unknown/director/plan',
       '/api/ai/providers/openrouter/test',
+      '/api/storage/verify',
     ]
     for (const path of postPaths) {
       const foreign = await get(path, {

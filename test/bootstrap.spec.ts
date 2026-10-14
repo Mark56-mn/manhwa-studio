@@ -6,6 +6,7 @@ import { AUTHOR, call, json } from './helpers'
 
 const ORIGIN = 'http://localhost:8787'
 const TABLES = [
+  'assets',
   'ai_route_events',
   'ai_provider_state',
   'ai_model_catalog',
@@ -60,9 +61,9 @@ describe('database initialization', () => {
     expect(body.status).toBe('degraded')
     expect(body.checks.database.state).toBe('failed')
     expect(body.checks.database.detail).toContain('no studio schema yet')
-    expect(body.checks.database.missing).toHaveLength(15)
+    expect(body.checks.database.missing).toHaveLength(16)
     expect(body.migrations.applied).toBe(false)
-    expect(body.migrations.pending).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql'])
+    expect(body.migrations.pending).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql', '0004_assets.sql'])
   })
 
   it('creates the schema once, then reports the database as verified', async () => {
@@ -70,7 +71,7 @@ describe('database initialization', () => {
     expect(first.status).toBe(200)
     const firstBody = (await first.json()) as { status: string; applied: string[]; detail: string }
     expect(firstBody.status).toBe('initialized')
-    expect(firstBody.applied).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql'])
+    expect(firstBody.applied).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql', '0004_assets.sql'])
 
     const health = (await (await SELF.fetch(`${ORIGIN}/api/health`)).json()) as {
       checks: { database: { state: string } }
@@ -78,7 +79,7 @@ describe('database initialization', () => {
     }
     expect(health.checks.database.state).toBe('connected_verified')
     expect(health.migrations.applied).toBe(true)
-    expect(health.migrations.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql'])
+    expect(health.migrations.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql', '0004_assets.sql'])
 
     const again = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
     expect(again.status).toBe(200)
@@ -90,20 +91,16 @@ describe('database initialization', () => {
     // First reach the full current schema, then rewind to a Phase-B-only state.
     await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
     await db.batch([
-      db.prepare('DROP TABLE IF EXISTS ai_route_events'),
-      db.prepare('DROP TABLE IF EXISTS ai_provider_state'),
-      db.prepare('DROP TABLE IF EXISTS ai_model_catalog'),
-      db.prepare('DROP TABLE IF EXISTS ai_settings'),
-      db.prepare('DROP TABLE IF EXISTS director_plans'),
-      db.prepare("DELETE FROM d1_migrations WHERE name = '0003_ai_router.sql'"),
+      db.prepare('DROP TABLE IF EXISTS assets'),
+      db.prepare("DELETE FROM d1_migrations WHERE name = '0004_assets.sql'"),
     ])
 
     const response = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
     expect(response.status).toBe(200)
     const body = (await response.json()) as { status: string; applied: string[]; recorded: string[] }
     expect(body.status).toBe('upgraded')
-    expect(body.applied).toEqual(['0003_ai_router.sql'])
-    expect(body.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql'])
+    expect(body.applied).toEqual(['0004_assets.sql'])
+    expect(body.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_ai_router.sql', '0004_assets.sql'])
 
     const health = (await (await SELF.fetch(`${ORIGIN}/api/health`)).json()) as {
       checks: { database: { state: string } }

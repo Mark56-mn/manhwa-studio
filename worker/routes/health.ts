@@ -93,7 +93,7 @@ healthRoutes.get('/health', async (c) => {
 
   const ready = database.state === 'connected_verified' && assets.state === 'connected_verified'
   const capabilities = await capabilityStatuses(env.DB, env)
-  const storage = mediaStorageStatus(env)
+  const storage = await mediaStorageStatus(env.DB, env)
   let schema = { missing: [] as string[], applied: [] as string[], pending: [] as string[] }
   try {
     schema = await inspectSchema(env.DB)

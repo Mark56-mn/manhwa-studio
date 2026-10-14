@@ -16,6 +16,7 @@ export default defineConfig(async () => {
         miniflare: {
           compatibilityDate: '2026-08-01',
           d1Databases: ['DB'],
+          r2Buckets: ['FILES'],
           bindings: {
             FREEBUFF_CLIENT_ID: 'test-client-id',
             FREEBUFF_ISSUER: 'https://freebuff.com/oidc',

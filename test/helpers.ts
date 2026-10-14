@@ -39,7 +39,10 @@ export async function call(
   if (method !== 'GET' && method !== 'HEAD' && !headers.has('Origin')) {
     headers.set('Origin', ORIGIN)
   }
-  if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json')
+  // A multipart body must keep its own content type (the runtime adds the boundary).
+  if (init.body && !headers.has('content-type') && !(init.body instanceof FormData)) {
+    headers.set('content-type', 'application/json')
+  }
   return app.request(path, { ...init, method, headers }, testEnv(envOverrides))
 }
 
@@ -51,6 +54,7 @@ export async function resetDatabase(): Promise<void> {
     db.prepare('DELETE FROM scenes'),
     db.prepare('DELETE FROM script_versions'),
     db.prepare('DELETE FROM director_plans'),
+    db.prepare('DELETE FROM assets'),
     db.prepare('DELETE FROM provider_checks'),
     db.prepare('DELETE FROM ai_route_events'),
     db.prepare('DELETE FROM ai_provider_state'),

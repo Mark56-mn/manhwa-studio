@@ -59,6 +59,14 @@ export type AiRole = (typeof AI_ROLES)[number]
 export const AI_TASKS = ['script', 'director_plan', 'connectivity'] as const
 export type AiTask = (typeof AI_TASKS)[number]
 
+/** Object-storage asset kinds. Bytes live in R2; only metadata lives in D1. */
+export const ASSET_KINDS = ['image', 'audio', 'video', 'caption', 'other'] as const
+export type AssetKind = (typeof ASSET_KINDS)[number]
+
+export const ASSET_STATUSES = ['stored', 'failed', 'deleted'] as const
+export type AssetStatus = (typeof ASSET_STATUSES)[number]
+
+
 
 /** Tables the application cannot work without. Used by /api/health readiness. */
 export const REQUIRED_TABLES = [
@@ -76,5 +84,6 @@ export const REQUIRED_TABLES = [
   'ai_provider_state',
   'ai_route_events',
   'director_plans',
+  'assets',
   'activity_events',
 ] as const

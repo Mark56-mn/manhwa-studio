@@ -1,4 +1,6 @@
 import type {
+  AssetKind,
+  AssetStatus,
   CharacterRole,
   EpisodeStatus,
   ParseState,
@@ -331,3 +333,45 @@ export function serializeDirectorPlan(row: DirectorPlanRow, includeBody = true) 
     ...(includeBody ? { rawText: row.raw_text, plan: parseJson(row.plan_json) } : {}),
   }
 }
+
+export interface AssetRow {
+  id: string
+  project_id: string
+  episode_id: string | null
+  kind: AssetKind
+  name: string
+  storage_key: string
+  content_type: string
+  byte_size: number
+  checksum: string | null
+  status: AssetStatus
+  provider: string | null
+  model: string | null
+  metadata_json: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export function serializeAsset(row: AssetRow) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    episodeId: row.episode_id,
+    kind: row.kind,
+    name: row.name,
+    contentType: row.content_type,
+    byteSize: row.byte_size,
+    checksum: row.checksum,
+    status: row.status,
+    provider: row.provider,
+    model: row.model,
+    metadata: parseJson(row.metadata_json) ?? {},
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    /** The object is fetched from this route, not from the key. */
+    contentPath: `/api/assets/${row.id}/content`,
+  }
+}
+

@@ -19,6 +19,7 @@ import {
 import { ApiError, api, fieldErrors } from '../lib/api'
 import { duration, relativeTime, titleCase } from '../lib/format'
 import { useResource } from '../lib/useResource'
+import { AssetsPanel } from '../components/AssetsPanel'
 
 import type { Character, Episode, EpisodeStatus, ProjectDetail as Detail, ProjectStatus } from '../lib/api'
 
@@ -39,7 +40,7 @@ const EPISODE_STATUSES: EpisodeStatus[] = [
 ]
 const ROLES: Character['role'][] = ['protagonist', 'antagonist', 'supporting', 'minor']
 
-type TabId = 'episodes' | 'story' | 'cast' | 'history'
+type TabId = 'episodes' | 'story' | 'cast' | 'assets' | 'history'
 
 export function ProjectDetail({
   projectId,
@@ -145,6 +146,7 @@ export function ProjectDetail({
           { id: 'episodes', label: 'Episodes', badge: episodes.length },
           { id: 'story', label: 'Story bible' },
           { id: 'cast', label: 'Cast', badge: characters.length },
+          { id: 'assets', label: 'Assets' },
           { id: 'history', label: 'History', badge: activity.length },
         ]}
         active={tab}
@@ -162,6 +164,7 @@ export function ProjectDetail({
       )}
       {tab === 'story' && <StoryTab project={project} onMutate={mutate} />}
       {tab === 'cast' && <CastTab projectId={project.id} characters={characters} onMutate={mutate} />}
+      {tab === 'assets' && <AssetsPanel projectId={project.id} />}
       {tab === 'history' && (
         <Card title="Production history" subtitle="Recorded actions for this project">
           {activity.length === 0 ? (

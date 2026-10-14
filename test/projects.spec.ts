@@ -269,8 +269,11 @@ describe('integrations reporting', () => {
       'media-storage',
     ])
     for (const capability of body.capabilities) {
-      expect(capability.state).toBe('not_configured')
       expect(capability.presentEnvVars).toHaveLength(0)
+      // An object-storage bucket is attached in the test runtime, but nothing
+      // has verified it yet; every other capability has no adapter configured.
+      expect(capability.state).toBe(capability.id === 'media-storage' ? 'configured_unverified' : 'not_configured')
+      expect(capability.state).not.toBe('connected_verified')
     }
     expect(body.secretsPolicy.envVarNamesOnly).toBe(true)
     // No secret values can leak: the payload only ever carries variable names.

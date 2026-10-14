@@ -1,6 +1,7 @@
 import { EPISODE_STATUSES, PROJECT_STATUSES } from './lib/constants'
 import { serializeProviderCheck } from './lib/rows'
 import { SCRIPT_ENV_VARS, describeAdapters, readEnvValue, resolveScriptConfig } from './providers'
+import { bucketFor } from './storage/service'
 
 import type { ProviderCheckRow } from './lib/rows'
 import type { Env } from './env'
@@ -222,32 +223,42 @@ function plannedStatus(definition: CapabilityDefinition, env: Env): CapabilitySt
   }
 }
 
-export function mediaStorageStatus(env: Env): CapabilityStatus {
-  const bucket = (env as unknown as { FILES?: { get?: unknown; put?: unknown } }).FILES
-  const attached = Boolean(bucket) && typeof bucket?.put === 'function'
-  if (!attached) {
+export async function mediaStorageStatus(db: D1Database, env: Env): Promise<CapabilityStatus> {
+  const base = { id: 'media-storage', label: 'Media storage (R2)', phase: 'B' as const, implemented: true }
+
+  if (!bucketFor(env)) {
     return {
-      id: 'media-storage',
-      label: 'Media storage (R2)',
-      phase: 'B',
+      ...base,
       state: 'not_configured',
       detail:
-        'No object-storage bucket is attached to this deployment yet. Generated images, audio and video need one (TASK-003).',
+        'No object-storage bucket is attached to this deployment, so uploads and generated media have nowhere to live. Bind an R2 bucket as FILES.',
       requiredEnvVars: [],
       presentEnvVars: [],
-      implemented: false,
     }
   }
+
+  // Attached is not the same as working: only a real round-trip verifies it.
+  // A database without the schema yet must not break the health endpoint.
+  const check = await lastCheck(db, 'media-storage', 'r2').catch(() => null)
+  if (check) {
+    const serialized = serializeProviderCheck(check)
+    return {
+      ...base,
+      state: check.status === 'ok' ? 'connected_verified' : 'failed',
+      detail: serialized.detail,
+      requiredEnvVars: [],
+      presentEnvVars: [],
+      verifiedAt: serialized.checkedAt,
+    }
+  }
+
   return {
-    id: 'media-storage',
-    label: 'Media storage (R2)',
-    phase: 'B',
+    ...base,
     state: 'configured_unverified',
     detail:
-      'An object-storage bucket is attached to this deployment. Read and write are exercised by the first real asset in TASK-003.',
+      'An object-storage bucket is attached. Not verified yet — run the storage check to perform a real put/read/delete round-trip.',
     requiredEnvVars: [],
     presentEnvVars: [],
-    implemented: false,
   }
 }
 
@@ -264,7 +275,7 @@ export async function capabilityStatuses(db: D1Database, env: Env): Promise<Capa
     }
     statuses.push(plannedStatus(definition, env))
   }
-  statuses.push(mediaStorageStatus(env))
+  statuses.push(await mediaStorageStatus(db, env))
   return statuses
 }
 

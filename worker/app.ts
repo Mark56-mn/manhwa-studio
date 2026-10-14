@@ -5,6 +5,7 @@ import { ensureUser } from './db'
 import { HttpError } from './lib/errors'
 import { newId } from './lib/ids'
 import { accountRoutes } from './routes/account'
+import { assetRoutes } from './routes/assets'
 import { aiRoutes } from './routes/ai'
 import { directorRoutes } from './routes/director'
 import { activityRoutes } from './routes/activity'
@@ -87,6 +88,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   app.route('/api', scriptRoutes)
   app.route('/api', directorRoutes)
   app.route('/api', aiRoutes)
+  app.route('/api', assetRoutes)
   app.route('/api', episodeRoutes)
   app.route('/api', seasonRoutes)
   app.route('/api', characterRoutes)

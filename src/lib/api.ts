@@ -257,7 +257,10 @@ async function parse(response: Response): Promise<unknown> {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
-  if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json')
+  // A multipart body must keep its own content type (the browser adds the boundary).
+  if (init.body && !headers.has('content-type') && !(init.body instanceof FormData)) {
+    headers.set('content-type', 'application/json')
+  }
 
   const response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
   const body = await parse(response)
@@ -433,3 +436,24 @@ export interface DirectorPlan {
   plan?: DirectorPlanBody | null
 }
 
+export type AssetKind = 'image' | 'audio' | 'video' | 'caption' | 'other'
+export type AssetStatus = 'stored' | 'failed' | 'deleted'
+
+export interface Asset {
+  id: string
+  projectId: string
+  episodeId: string | null
+  kind: AssetKind
+  name: string
+  contentType: string
+  byteSize: number
+  checksum: string | null
+  status: AssetStatus
+  provider: string | null
+  model: string | null
+  metadata: Record<string, unknown>
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  contentPath: string
+}

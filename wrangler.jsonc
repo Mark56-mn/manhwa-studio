@@ -21,6 +21,9 @@
     "APP_ORIGIN": "http://localhost:8787",
     "APP_VERSION": "0.1.0"
   },
+  // Object storage for real media (TASK-004). Local `wrangler dev` provisions
+  // this bucket automatically; a deployed site must expose the same binding.
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "manhwa-studio-media" }],
   "d1_databases": [
     {
       "binding": "DB",
