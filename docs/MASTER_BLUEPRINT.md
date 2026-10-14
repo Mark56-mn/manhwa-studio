@@ -122,6 +122,17 @@ Migration 0003 (Phase B, TASK-003) adds the AI router's state:
   was skipped, and which one completed the task. No keys, no story content.
 - `director_plans` — immutable Director AI plan versions per episode.
 
+Migration 0004 (Phase B, TASK-004) adds real object storage:
+
+- `assets` — one row per stored object: project, optional episode, kind, name,
+  server-generated storage key, content type, byte size, checksum, status,
+  provider/model and metadata. The bytes live in R2; this table never holds a
+  binary, and the key is generated server-side so a filename cannot escape its
+  project prefix.
+- The media-storage capability is derived from `provider_checks` like every other
+  capability: `not_configured` with no bucket, `configured_unverified` when one is
+  attached, and `connected_verified` only after a real put/read/delete round-trip.
+
 Migrations are applied either by `wrangler d1 migrations apply` or by
 `POST /api/bootstrap`, which now applies whichever migrations are pending (each
 in one atomic batch) and refuses an inconsistent schema instead of guessing.
@@ -139,8 +150,11 @@ in one atomic batch) and refuses an inconsistent schema instead of guessing.
     Google Gemini, Baseten, plus OpenAI/Anthropic/custom) and a central AI task
     router with automatic failover, circuit breakers, free-budget protection and
     per-role Director/Script settings.
-  - TASK-004+ (next): object storage (R2) + `assets` rows, image generation,
-    narration audio, then video assembly and owner review.
+  - TASK-004 (done): real object storage — an R2 bucket bound as `FILES`, an
+    `assets` table holding metadata only, a real upload/read/list/delete path, and
+    an honest media-storage capability.
+  - TASK-005+ (next): image generation, narration audio, then video assembly and
+    owner review.
 - **Phase C:** durable jobs, retries, timeouts, cancellation, logs, remote GPU
   worker for rendering.
 - **Phase D:** YouTube OAuth, private/unlisted test upload with verified video

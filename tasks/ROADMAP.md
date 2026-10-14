@@ -32,13 +32,17 @@ Order matters: provider choice, then artifacts, then assembly.
    Script AI settings, real connection tests / model discovery / capability
    probes, and a Settings UI. See
    `handoffs/HANDOFF-003-ai-provider-router.md`.
-3. **TASK-004 — object storage.** Provision R2, add the `assets` table, and
-   store generated media as objects with metadata rows (never binaries in D1).
+3. **TASK-004 — object storage + assets. (done)** R2 bucket bound as `FILES`,
+   an `assets` table holding only metadata (never binaries), a real
+   upload/read/list/delete path, and an honest media-storage capability that only
+   reads `connected_verified` after a real put/read/delete round-trip. See
+   `handoffs/HANDOFF-004-object-storage.md`.
 4. **TASK-005 — image generation.** Scene + character art with continuity
    references from the story bible and the `scenes.image_prompt` written by
-   TASK-002; store real files, record provider/model/dimensions.
+   TASK-002; store the real file through the TASK-004 asset path and record
+   provider/model/dimensions.
 5. **TASK-006 — voice generation.** Narration audio per scene; store artifact +
-   voice settings.
+   voice settings through the same asset path.
 6. **TASK-007 — video assembly.** Render scenes + narration + captions into a
    playable file; validate with media tools; owner plays it before approval.
 

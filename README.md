@@ -26,6 +26,7 @@ connected yet — see "What is not built yet".
 | Script AI (versioned script generation) | Working through the AI task router |
 | Unified AI providers: OpenRouter, NVIDIA NIM, Google Gemini, Baseten, OpenAI, Anthropic, custom | Adapters + router implemented; live only when a key is set |
 | Per-provider connection tests, model discovery, capability probes | Working (real low-token calls) |
+| Object storage + assets (upload, list, open, delete) | Working when an R2 bucket is bound as `FILES`; honest `not_configured` otherwise |
 | Image / voice / video workers | **Not built (Phase B/C)** |
 | YouTube publishing | **Not built (Phase D)** |
 
@@ -101,6 +102,7 @@ npm run verify       # all of the above
 | `OPENROUTER_BASE_URL`, `NVIDIA_BASE_URL`, `BASETEN_BASE_URL`, `GEMINI_BASE_URL` | Override a provider endpoint | Optional; sensible defaults are built in |
 | `DIRECTOR_PROVIDER`, `DIRECTOR_MODEL`, `SCRIPT_PROVIDER`, `SCRIPT_MODEL`, `SCRIPT_API_KEY` | Default role choices / legacy single-provider config | Optional; the Settings UI stores per-role choices in the database |
 | `AI_ALLOW_PAID`, `AI_MAX_ATTEMPTS`, `AI_TASK_TIMEOUT_MS`, `SCRIPT_MAX_OUTPUT_TOKENS` | Router safety limits | Optional |
+| `FILES` | Object storage (R2) for generated and uploaded media | A bucket binding, not a variable; declared in `wrangler.jsonc` and provided by the deployment |
 | `IMAGE_*`, `VOICE_*`, `RENDER_*`, `YOUTUBE_*` | Later phases — no adapter in this build | Not read; the studio reports them honestly as not built |
 
 There are **no secrets in this repository**, and there is no client secret for
@@ -157,11 +159,14 @@ assets:
    bundled Worker module).
 2. Deploy using `deploy.manifest.json`, which points `entrypoint` at the
    bundled worker and `assetsDirectory` at `./dist` with SPA fallback.
-3. The deployment injects `FREEBUFF_CLIENT_ID`, `FREEBUFF_ISSUER` and
+3. **Bind object storage.** `wrangler.jsonc` declares an R2 bucket as `FILES`
+   (`manhwa-studio-media`). A deployed site must expose the same binding; without
+   it the studio still runs and reports media storage as `not_configured`.
+4. The deployment injects `FREEBUFF_CLIENT_ID`, `FREEBUFF_ISSUER` and
    `APP_ORIGIN`; the auth callback registered for the site must be
    `<site origin>/auth/freebuff/callback`. Preview and production have separate
    databases and separate callbacks.
-4. **Initialize the database once.** A fresh database is empty, so the first
+5. **Initialize the database once.** A fresh database is empty, so the first
    visit shows an "Initialize the studio database" screen — press the button,
    or call the endpoint directly:
 
