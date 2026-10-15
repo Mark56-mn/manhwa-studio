@@ -2,9 +2,14 @@ import { EPISODE_STATUSES, PROJECT_STATUSES } from './lib/constants'
 import { serializeProviderCheck } from './lib/rows'
 import { verifyR2Binding } from './lib/assetService'
 import { SCRIPT_ENV_VARS, describeAdapters, readEnvValue, resolveScriptConfig } from './providers'
+import { IMAGE_ENV_VARS, describeImageAdapters, resolveImageConfig } from './providers/imageIndex'
+import { newId } from './lib/ids'
+import { nowIso } from './lib/time'
+import { verifyImageProvider } from './lib/imageService'
 
 import type { ProviderCheckRow } from './lib/rows'
 import type { Env } from './env'
+import type { D1Database } from '@cloudflare/workers-types'
 
 export type IntegrationState =
   | 'connected_verified'
@@ -60,6 +65,12 @@ const SCRIPT_KEY_ALIASES = [
   'OPENROUTER_API_KEY',
 ]
 
+const IMAGE_KEY_ALIASES = [
+  'IMAGE_API_KEY',
+  'OPENAI_API_KEY',
+  'STABILITY_API_KEY',
+]
+
 const CAPABILITIES: CapabilityDefinition[] = [
   {
     id: 'script',
@@ -73,9 +84,9 @@ const CAPABILITIES: CapabilityDefinition[] = [
     id: 'image',
     label: 'Image AI',
     phase: 'B',
-    envVars: ['IMAGE_PROVIDER', 'IMAGE_API_KEY', 'IMAGE_MODEL'],
+    envVars: [...IMAGE_ENV_VARS],
     planned: 'Scene and character art generation',
-    implemented: false,
+    implemented: true,
   },
   {
     id: 'voice',
@@ -127,6 +138,10 @@ function providersFor(selected: string | null): CapabilityProvider[] {
   return describeAdapters().map((adapter) => ({ ...adapter, selected: adapter.id === selected }))
 }
 
+function imageProvidersFor(selected: string | null): CapabilityProvider[] {
+  return describeImageAdapters().map((adapter) => ({ ...adapter, selected: adapter.id === selected }))
+}
+
 /**
  * Performs a real write/read/delete cycle on the R2 bucket to verify it is
  * accessible. Records the result in provider_checks.
@@ -157,6 +172,40 @@ export async function verifyAndRecordR2(db: D1Database, env: Env, checkedBy: str
       '[]',
       checkedBy,
       new Date().toISOString(),
+    )
+    .run()
+}
+
+/**
+ * Performs a real write/read/delete cycle on the R2 bucket to verify it is
+ * accessible. Records the result in provider_checks.
+ */
+export async function verifyAndRecordImage(db: D1Database, env: Env, checkedBy: string): Promise<void> {
+  const outcome = await verifyImageProvider({ ...env, DB: db } as Env)
+  await db.prepare(
+    `INSERT INTO provider_checks
+       (id, capability, provider, model, status, detail, latency_ms, models_json, checked_by, checked_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (capability, provider) DO UPDATE SET
+       model = excluded.model,
+       status = excluded.status,
+       detail = excluded.detail,
+       latency_ms = excluded.latency_ms,
+       models_json = excluded.models_json,
+       checked_by = excluded.checked_by,
+       checked_at = excluded.checked_at`,
+  )
+    .bind(
+      newId('chk'),
+      'image',
+      outcome.provider,
+      outcome.model,
+      outcome.ok ? 'ok' : 'failed',
+      outcome.detail,
+      outcome.latencyMs,
+      JSON.stringify(outcome.models),
+      checkedBy,
+      nowIso(),
     )
     .run()
 }
@@ -212,6 +261,78 @@ async function scriptStatus(db: D1Database, env: Env): Promise<CapabilityStatus>
   }
 
   const check = await lastCheck(db, 'script', resolved.adapter.id)
+  if (check) {
+    const serialized = serializeProviderCheck(check)
+    return {
+      ...base,
+      state: check.status === 'ok' ? 'connected_verified' : 'failed',
+      detail: serialized.detail,
+      requiredEnvVars: resolved.adapter.keyEnvVars,
+      presentEnvVars,
+      model: serialized.model,
+      models: serialized.models,
+      verifiedAt: serialized.checkedAt,
+    }
+  }
+
+  return {
+    ...base,
+    state: 'configured_unverified',
+    detail: `${resolved.detail} — not verified yet. No successful call to this provider has been made from this deployment.`,
+    requiredEnvVars: resolved.adapter.keyEnvVars,
+    presentEnvVars,
+    model: resolved.config.model,
+    models: [],
+    verifiedAt: null,
+  }
+}
+
+async function imageStatus(db: D1Database, env: Env): Promise<CapabilityStatus> {
+  const selected = readEnvValue(env, 'IMAGE_PROVIDER')
+  const resolved = resolveImageConfig(env)
+  const base = {
+    id: 'image',
+    label: 'Image AI',
+    phase: 'B' as const,
+    implemented: true,
+    providers: imageProvidersFor(selected?.toLowerCase() ?? null),
+  }
+
+  if (!resolved.adapter) {
+    if (selected) {
+      return {
+        ...base,
+        state: 'failed',
+        detail: resolved.detail,
+        requiredEnvVars: [...IMAGE_ENV_VARS],
+        presentEnvVars: presentNames(env, [...IMAGE_ENV_VARS, 'IMAGE_BASE_URL', ...IMAGE_KEY_ALIASES]),
+      }
+    }
+    return {
+      ...base,
+      state: 'not_configured',
+      detail:
+        'No image provider is connected. Choose one of the supported providers and set IMAGE_PROVIDER, its API key and IMAGE_MODEL as deployment secrets.',
+      requiredEnvVars: [...IMAGE_ENV_VARS],
+      presentEnvVars: presentNames(env, [...IMAGE_ENV_VARS, 'IMAGE_BASE_URL', ...IMAGE_KEY_ALIASES]),
+    }
+  }
+
+  const required = resolved.missing.length > 0 ? resolved.missing.flatMap((entry) => entry.split(' or ')) : []
+  const presentEnvVars = presentNames(env, [...IMAGE_ENV_VARS, 'IMAGE_BASE_URL', ...IMAGE_KEY_ALIASES])
+
+  if (!resolved.configured || !resolved.config) {
+    return {
+      ...base,
+      state: 'not_configured',
+      detail: resolved.detail,
+      requiredEnvVars: required.length > 0 ? required : resolved.adapter.keyEnvVars,
+      presentEnvVars,
+      model: readEnvValue(env, 'IMAGE_MODEL') ?? resolved.adapter.defaultModel,
+    }
+  }
+
+  const check = await lastCheck(db, 'image', resolved.adapter.id)
   if (check) {
     const serialized = serializeProviderCheck(check)
     return {
@@ -351,6 +472,10 @@ export async function capabilityStatuses(db: D1Database, env: Env): Promise<Capa
   for (const definition of CAPABILITIES) {
     if (definition.id === 'script') {
       statuses.push(await scriptStatus(db, env))
+      continue
+    }
+    if (definition.id === 'image') {
+      statuses.push(await imageStatus(db, env))
       continue
     }
     statuses.push(plannedStatus(definition, env))

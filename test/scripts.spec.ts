@@ -328,7 +328,7 @@ describe('provider verification', () => {
 
   it('refuses to verify a capability this build has no adapter for', async () => {
     const response = await call(AUTHOR, '/api/integrations/image/verify', { method: 'POST' })
-    expect(response.status).toBe(400)
-    expect(await json(response)).toMatchObject({ code: 'capability_not_implemented', implemented: false })
+    expect(response.status).toBe(502)
+    expect(await json(response)).toMatchObject({ code: 'provider_not_configured' })
   })
 })

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 
-import { capabilityStatuses, verifyAndRecordR2 } from '../capabilities'
+import { capabilityStatuses, verifyAndRecordR2, verifyAndRecordImage } from '../capabilities'
 import { newId } from '../lib/ids'
 import { nowIso } from '../lib/time'
 import { runScriptProviderCheck } from '../providers'
@@ -78,6 +78,14 @@ integrationRoutes.post('/integrations/:capability/verify', async (c) => {
   if (capability === 'media-storage') {
     const ownerId = c.get('user').sub
     await verifyAndRecordR2(c.env.DB, c.env, ownerId)
+    return c.json({
+      capabilities: await capabilityStatuses(c.env.DB, c.env),
+    })
+  }
+
+  if (capability === 'image') {
+    const ownerId = c.get('user').sub
+    await verifyAndRecordImage(c.env.DB, c.env, ownerId)
     return c.json({
       capabilities: await capabilityStatuses(c.env.DB, c.env),
     })

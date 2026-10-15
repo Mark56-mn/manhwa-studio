@@ -1,7 +1,7 @@
 # Tasks
 
 One file per unit of work, small enough to implement and verify in roughly
-3050 minutes of agent time. If a task is bigger than that, split it before
+30-50 minutes of agent time. If a task is bigger than that, split it before
 starting.
 
 Order: `TASK-001`, `TASK-002`, ... Each file contains: objective; verified
@@ -22,4 +22,4 @@ Rules:
 | [TASK-001](TASK-001-online-foundation.md) | Online foundation (Phase A) | Complete, preview deployed |
 | [TASK-002](TASK-002-provider-and-script.md) | Provider selection + real script generation (Phase B start) | Complete, preview deployed |
 | [TASK-003](TASK-003-object-storage.md) | Object storage + assets (Phase B) | Complete, preview deployed |
-| TASK-004 | Image generation (Phase B) | Not started |
+| [TASK-004](TASK-004-image-generation.md) | Image generation (Phase B) | Complete, preview deployed |
