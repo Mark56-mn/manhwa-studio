@@ -20,9 +20,30 @@ const TABLES = [
   'assets',
 ]
 
+/**
+ * Drop tables in reverse dependency order to avoid foreign key constraint errors.
+ * Child tables must be dropped before parent tables.
+ */
+const DROP_ORDER = [
+  'script_approvals',
+  'scenes',
+  'script_versions',
+  'assets',
+  'provider_checks',
+  'activity_events',
+  'characters',
+  'episodes',
+  'seasons',
+  'projects',
+  'users',
+  'd1_migrations',
+]
+
 async function dropTables(tables: string[] = TABLES): Promise<void> {
   const db = (env as unknown as { DB: D1Database }).DB
-  await db.batch(tables.map((table) => db.prepare(`DROP TABLE IF EXISTS ${table}`)))
+  // Drop in reverse dependency order
+  const ordered = DROP_ORDER.filter((t) => tables.includes(t))
+  await db.batch(ordered.map((table) => db.prepare(`DROP TABLE IF EXISTS ${table}`)))
 }
 
 /**
@@ -90,7 +111,9 @@ describe('database initialization', () => {
       db.prepare('DROP TABLE IF EXISTS scenes'),
       db.prepare('DROP TABLE IF EXISTS script_versions'),
       db.prepare('DROP TABLE IF EXISTS provider_checks'),
+      db.prepare('DROP TABLE IF EXISTS assets'),
       db.prepare("DELETE FROM d1_migrations WHERE name = '0002_phase_b_scripts.sql'"),
+      db.prepare("DELETE FROM d1_migrations WHERE name = '0003_phase_b_assets.sql'"),
     ])
 
     const response = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
@@ -109,12 +132,13 @@ describe('database initialization', () => {
   it('refuses to touch a partially present schema', async () => {
     // Start from a complete schema, then remove one table.
     await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
-    await dropTables(['activity_events'])
+    const db = (env as unknown as { DB: D1Database }).DB
+    await db.prepare('DROP TABLE IF EXISTS activity_events').run()
     const response = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
     expect(response.status).toBe(409)
     const body = (await response.json()) as { status: string; missing: string[] }
     expect(body.status).toBe('refused')
-    expect(body.missing).toEqual(['activity_events', 'assets'])
+    expect(body.missing).toEqual(['activity_events'])
   })
 
   it('requires a same-origin request to initialize', async () => {

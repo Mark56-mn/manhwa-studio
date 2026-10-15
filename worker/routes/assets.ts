@@ -6,6 +6,7 @@ import { downloadAsset, getAsset, listAssets, listAssetsByEpisode, uploadAsset, 
 
 import type { AppBindings } from '../app'
 import type { AssetType } from '../lib/rows'
+import type { Context } from 'hono'
 
 export const assetRoutes = new Hono<AppBindings>()
 
@@ -21,7 +22,7 @@ function validateAssetType(type: string): AssetType {
 /**
  * Lists assets for a project.
  */
-async function listProjectAssets(c: any, projectId: string): Promise<Response> {
+async function listProjectAssets(c: Context<AppBindings>, projectId: string): Promise<Response> {
   const user = c.get('user')
   const db = c.env.DB
 
@@ -44,7 +45,7 @@ async function listProjectAssets(c: any, projectId: string): Promise<Response> {
 /**
  * Lists assets for an episode.
  */
-async function listEpisodeAssets(c: any, episodeId: string): Promise<Response> {
+async function listEpisodeAssets(c: Context<AppBindings>, episodeId: string): Promise<Response> {
   const user = c.get('user')
   const db = c.env.DB
 
@@ -70,7 +71,7 @@ async function listEpisodeAssets(c: any, episodeId: string): Promise<Response> {
 /**
  * Gets metadata for a single asset.
  */
-async function getSingleAsset(c: any, assetId: string): Promise<Response> {
+async function getSingleAsset(c: Context<AppBindings>, assetId: string): Promise<Response> {
   const user = c.get('user')
   const db = c.env.DB
 
@@ -91,7 +92,7 @@ async function getSingleAsset(c: any, assetId: string): Promise<Response> {
 /**
  * Uploads a new asset.
  */
-async function uploadNewAsset(c: any): Promise<Response> {
+async function uploadNewAsset(c: Context<AppBindings>): Promise<Response> {
   const user = c.get('user')
   const db = c.env.DB
   const env = c.env
@@ -104,8 +105,8 @@ async function uploadNewAsset(c: any): Promise<Response> {
     return c.json({ error: 'Empty body', code: 'invalid_request' }, 400)
   }
 
-  // Parse query parameters
-  const projectId = c.req.query('projectId')
+  // Parse query parameters - these may be undefined
+  const projectId = c.req.query('projectId') ?? ''
   const episodeId = c.req.query('episodeId')
   const typeParam = c.req.query('type')
 
@@ -125,13 +126,15 @@ async function uploadNewAsset(c: any): Promise<Response> {
   }
 
   // Verify episode exists and belongs to project
-  let episode: { id: string } | null = null
+  let episodeIdValue: string | null = null
   if (episodeId) {
-    episode = await db
+    const ep = await db
       .prepare('SELECT id FROM episodes WHERE id = ? AND project_id = ?')
       .bind(episodeId, projectId)
-      .first()
-    if (!episode) {
+      .first<{ id: string }>()
+    if (ep) {
+      episodeIdValue = ep.id
+    } else {
       return c.json({ error: 'Episode not found', code: 'not_found' }, 404)
     }
   }
@@ -140,7 +143,7 @@ async function uploadNewAsset(c: any): Promise<Response> {
   try {
     const result = await uploadAsset(env, {
       projectId,
-      episodeId: episode?.id ?? null,
+      episodeId: episodeIdValue,
       type,
       contentType,
       body,
@@ -170,7 +173,7 @@ async function uploadNewAsset(c: any): Promise<Response> {
 /**
  * Downloads an asset.
  */
-async function downloadSingleAsset(c: any, assetId: string): Promise<Response> {
+async function downloadSingleAsset(c: Context<AppBindings>, assetId: string): Promise<Response> {
   const user = c.get('user')
   const db = c.env.DB
   const env = c.env
@@ -210,7 +213,7 @@ async function downloadSingleAsset(c: any, assetId: string): Promise<Response> {
 /**
  * Deletes an asset.
  */
-async function deleteSingleAsset(c: any, assetId: string): Promise<Response> {
+async function deleteSingleAsset(c: Context<AppBindings>, assetId: string): Promise<Response> {
   const user = c.get('user')
   const db = c.env.DB
   const env = c.env
@@ -244,7 +247,7 @@ async function deleteSingleAsset(c: any, assetId: string): Promise<Response> {
 }
 
 // Route definitions
-assetRoutes.get('/assets', async (c) => {
+assetRoutes.get('/assets', async (c: Context<AppBindings>) => {
   const projectId = c.req.query('projectId')
   const episodeId = c.req.query('episodeId')
 
@@ -260,9 +263,21 @@ assetRoutes.get('/assets', async (c) => {
   )
 })
 
-assetRoutes.get('/assets/:id', (c) => getSingleAsset(c, c.req.param('id')))
-assetRoutes.get('/assets/:id/download', (c) => downloadSingleAsset(c, c.req.param('id')))
+assetRoutes.get('/assets/:id', (c: Context<AppBindings>) => {
+  const id = c.req.param('id')
+  if (!id) return c.json({ error: 'Asset ID is required', code: 'invalid_request' }, 400)
+  return getSingleAsset(c, id)
+})
+assetRoutes.get('/assets/:id/download', (c: Context<AppBindings>) => {
+  const id = c.req.param('id')
+  if (!id) return c.json({ error: 'Asset ID is required', code: 'invalid_request' }, 400)
+  return downloadSingleAsset(c, id)
+})
 
-assetRoutes.post('/assets/upload', (c) => uploadNewAsset(c))
+assetRoutes.post('/assets/upload', (c: Context<AppBindings>) => uploadNewAsset(c))
 
-assetRoutes.delete('/assets/:id', (c) => deleteSingleAsset(c, c.req.param('id')))
+assetRoutes.delete('/assets/:id', (c: Context<AppBindings>) => {
+  const id = c.req.param('id')
+  if (!id) return c.json({ error: 'Asset ID is required', code: 'invalid_request' }, 400)
+  return deleteSingleAsset(c, id)
+})
