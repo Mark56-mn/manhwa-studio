@@ -110,22 +110,28 @@ Migrations are applied either by `wrangler d1 migrations apply` or by
 `POST /api/bootstrap`, which now applies whichever migrations are pending (each
 in one atomic batch) and refuses an inconsistent schema instead of guessing.
 
-## 5. Phases
+## 5. Task and phase map
 
-- **Phase A (done, this repo):** online foundation — responsive studio,
-  authentication, persistent projects/episodes, real health endpoint, honest
-  integration status, deployment.
-- **Phase B (in progress):** first real production.
-  - TASK-002 (done): provider adapter layer (`openai`, `openrouter`,
-    `anthropic`, `google`, `custom`), real provider verification, versioned
-    scripts with append-only approvals, parsed scenes, and an episode workspace.
-  - TASK-003+ (next): object storage (R2) + `assets` rows, image generation,
-    narration audio, then video assembly and owner review.
-- **Phase C:** durable jobs, retries, timeouts, cancellation, logs, remote GPU
-  worker for rendering.
-- **Phase D:** YouTube OAuth, private/unlisted test upload with verified video
-  id and status, explicit approval before public.
-- **Phase E:** editing tools, continuity improvements, scheduling, analytics.
+- **Phase A (complete):** online foundation — responsive studio, authentication, D1-backed projects/episodes, health/integration status and deployment.
+- **TASK-002 (complete):** provider adapters and real, versioned script generation with append-only approvals.
+- **TASK-003 (complete per prior handoff):** R2 object storage and asset metadata/API.
+- **TASK-004 (next):** central AI router, bounded failover, Baseten and NVIDIA candidates, and default-deny cost rules. See `tasks/TASK-004-ai-router-failover.md`.
+- **TASK-005:** real image-generation adapter and R2 persistence.
+- **TASK-006:** character continuity and scene-image review/version selection.
+- **TASK-007:** voice/narration generation and audio assets.
+- **TASK-008:** external FFmpeg motion-comic assembly and playable-video validation.
+- **TASK-009:** durable job orchestration, retries, cancellation and recovery.
+- **TASK-010:** director/showrunner plan, dependency graph and owner approval.
+- **TASK-011:** YouTube OAuth and private/unlisted upload.
+- **TASK-012:** separate explicit publication approval and audit.
+- **TASK-013:** editing, continuity checks, accessibility and polish.
+- **TASK-014:** end-to-end release rehearsal, security/licensing/cost review and launch checklist.
+
+Full scopes and acceptance criteria for TASK-005 through TASK-014 are in `tasks/PHASE-B-TO-E-EXECUTION-PLAN.md`.
+
+## 6. Provider and Baseten note
+
+Baseten's OpenAI-compatible inference endpoint is `https://inference.baseten.co/v1`; verify the current official model API, authentication contract and model catalog during TASK-004. Baseten inference is usage-priced. Do not assume a permanent free tier or available credits. Keep `BASETEN_API_KEY` server-side, and do not make chargeable live calls without owner authorization.
 
 ## 6. Deployment topology
 
