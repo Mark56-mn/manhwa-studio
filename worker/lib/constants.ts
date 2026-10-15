@@ -63,4 +63,5 @@ export const REQUIRED_TABLES = [
   'scenes',
   'provider_checks',
   'activity_events',
+  'assets',
 ] as const

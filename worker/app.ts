@@ -6,6 +6,7 @@ import { HttpError } from './lib/errors'
 import { newId } from './lib/ids'
 import { accountRoutes } from './routes/account'
 import { activityRoutes } from './routes/activity'
+import { assetRoutes } from './routes/assets'
 import { characterRoutes } from './routes/characters'
 import { episodeRoutes } from './routes/episodes'
 import { bootstrapRoutes } from './routes/bootstrap'
@@ -83,6 +84,7 @@ export function createApp(deps: AppDeps): Hono<AppBindings> {
   app.route('/api', overviewRoutes)
   app.route('/api', projectRoutes)
   app.route('/api', scriptRoutes)
+  app.route('/api', assetRoutes)
   app.route('/api', episodeRoutes)
   app.route('/api', seasonRoutes)
   app.route('/api', characterRoutes)

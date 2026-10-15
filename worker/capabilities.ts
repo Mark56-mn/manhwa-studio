@@ -1,5 +1,6 @@
 import { EPISODE_STATUSES, PROJECT_STATUSES } from './lib/constants'
 import { serializeProviderCheck } from './lib/rows'
+import { verifyR2Binding } from './lib/assetService'
 import { SCRIPT_ENV_VARS, describeAdapters, readEnvValue, resolveScriptConfig } from './providers'
 
 import type { ProviderCheckRow } from './lib/rows'
@@ -114,8 +115,50 @@ async function lastCheck(db: D1Database, capability: string, provider: string): 
   return row ?? null
 }
 
+async function lastR2Check(db: D1Database): Promise<ProviderCheckRow | null> {
+  const row = await db
+    .prepare('SELECT * FROM provider_checks WHERE capability = ? AND provider = ?')
+    .bind('media-storage', 'r2')
+    .first<ProviderCheckRow>()
+  return row ?? null
+}
+
 function providersFor(selected: string | null): CapabilityProvider[] {
   return describeAdapters().map((adapter) => ({ ...adapter, selected: adapter.id === selected }))
+}
+
+/**
+ * Performs a real write/read/delete cycle on the R2 bucket to verify it is
+ * accessible. Records the result in provider_checks.
+ */
+export async function verifyAndRecordR2(db: D1Database, env: Env, checkedBy: string): Promise<void> {
+  const outcome = await verifyR2Binding(env)
+  await db.prepare(
+    `INSERT INTO provider_checks
+       (id, capability, provider, model, status, detail, latency_ms, models_json, checked_by, checked_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (capability, provider) DO UPDATE SET
+       model = excluded.model,
+       status = excluded.status,
+       detail = excluded.detail,
+       latency_ms = excluded.latency_ms,
+       models_json = excluded.models_json,
+       checked_by = excluded.checked_by,
+       checked_at = excluded.checked_at`,
+  )
+    .bind(
+      `chk_${crypto.randomUUID()}`,
+      outcome.capability,
+      outcome.provider,
+      null,
+      outcome.ok ? 'ok' : 'failed',
+      outcome.detail,
+      outcome.latencyMs,
+      '[]',
+      checkedBy,
+      new Date().toISOString(),
+    )
+    .run()
 }
 
 /**
@@ -222,6 +265,54 @@ function plannedStatus(definition: CapabilityDefinition, env: Env): CapabilitySt
   }
 }
 
+async function r2Status(db: D1Database, env: Env): Promise<CapabilityStatus> {
+  const bucket = (env as unknown as { FILES?: { get?: unknown; put?: unknown } }).FILES
+  const attached = Boolean(bucket) && typeof bucket?.put === 'function'
+
+  if (!attached) {
+    return {
+      id: 'media-storage',
+      label: 'Media storage (R2)',
+      phase: 'B',
+      state: 'not_configured',
+      detail:
+        'No object-storage bucket is attached to this deployment yet. Generated images, audio and video need one (TASK-003).',
+      requiredEnvVars: [],
+      presentEnvVars: [],
+      implemented: true,
+    }
+  }
+
+  const check = await lastR2Check(db)
+  if (check) {
+    const serialized = serializeProviderCheck(check)
+    return {
+      id: 'media-storage',
+      label: 'Media storage (R2)',
+      phase: 'B',
+      state: check.status === 'ok' ? 'connected_verified' : 'failed',
+      detail: serialized.detail,
+      requiredEnvVars: [],
+      presentEnvVars: [],
+      implemented: true,
+      verifiedAt: serialized.checkedAt,
+    }
+  }
+
+  return {
+    id: 'media-storage',
+    label: 'Media storage (R2)',
+    phase: 'B',
+    state: 'configured_unverified',
+    detail:
+      'An object-storage bucket is attached to this deployment. A real read/write cycle has not been performed yet.',
+    requiredEnvVars: [],
+    presentEnvVars: [],
+    implemented: true,
+    verifiedAt: null,
+  }
+}
+
 export function mediaStorageStatus(env: Env): CapabilityStatus {
   const bucket = (env as unknown as { FILES?: { get?: unknown; put?: unknown } }).FILES
   const attached = Boolean(bucket) && typeof bucket?.put === 'function'
@@ -264,7 +355,7 @@ export async function capabilityStatuses(db: D1Database, env: Env): Promise<Capa
     }
     statuses.push(plannedStatus(definition, env))
   }
-  statuses.push(mediaStorageStatus(env))
+  statuses.push(await r2Status(db, env))
   return statuses
 }
 

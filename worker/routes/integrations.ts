@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 
-import { capabilityStatuses } from '../capabilities'
+import { capabilityStatuses, verifyAndRecordR2 } from '../capabilities'
 import { newId } from '../lib/ids'
 import { nowIso } from '../lib/time'
 import { runScriptProviderCheck } from '../providers'
@@ -33,54 +33,62 @@ integrationRoutes.get('/integrations', async (c) => {
  */
 integrationRoutes.post('/integrations/:capability/verify', async (c) => {
   const capability = c.req.param('capability')
-  if (capability !== 'script') {
+  if (capability === 'script') {
+    const outcome = await runScriptProviderCheck(c.env)
+    const ownerId = c.get('user').sub
+
+    await c.env.DB.prepare(
+      `INSERT INTO provider_checks
+         (id, capability, provider, model, status, detail, latency_ms, models_json, checked_by, checked_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (capability, provider) DO UPDATE SET
+         model = excluded.model,
+         status = excluded.status,
+         detail = excluded.detail,
+         latency_ms = excluded.latency_ms,
+         models_json = excluded.models_json,
+         checked_by = excluded.checked_by,
+         checked_at = excluded.checked_at`,
+    )
+      .bind(
+        newId('chk'),
+        outcome.capability,
+        outcome.provider,
+        outcome.model,
+        outcome.ok ? 'ok' : 'failed',
+        outcome.detail,
+        outcome.latencyMs,
+        JSON.stringify(outcome.models),
+        ownerId,
+        nowIso(),
+      )
+      .run()
+
+    const status = outcome.ok ? 200 : outcome.code === 'provider_not_configured' ? 400 : 502
+
     return c.json(
       {
-        error: `This build has no adapter for the "${capability}" capability yet, so there is nothing to verify.`,
-        code: 'capability_not_implemented',
-        implemented: false,
+        result: outcome,
+        capabilities: await capabilityStatuses(c.env.DB, c.env),
       },
-      400,
+      status as 200,
     )
   }
 
-  const outcome = await runScriptProviderCheck(c.env)
-  const ownerId = c.get('user').sub
-
-  await c.env.DB.prepare(
-    `INSERT INTO provider_checks
-       (id, capability, provider, model, status, detail, latency_ms, models_json, checked_by, checked_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (capability, provider) DO UPDATE SET
-       model = excluded.model,
-       status = excluded.status,
-       detail = excluded.detail,
-       latency_ms = excluded.latency_ms,
-       models_json = excluded.models_json,
-       checked_by = excluded.checked_by,
-       checked_at = excluded.checked_at`,
-  )
-    .bind(
-      newId('chk'),
-      outcome.capability,
-      outcome.provider,
-      outcome.model,
-      outcome.ok ? 'ok' : 'failed',
-      outcome.detail,
-      outcome.latencyMs,
-      JSON.stringify(outcome.models),
-      ownerId,
-      nowIso(),
-    )
-    .run()
-
-  const status = outcome.ok ? 200 : outcome.code === 'provider_not_configured' ? 400 : 502
+  if (capability === 'media-storage') {
+    const ownerId = c.get('user').sub
+    await verifyAndRecordR2(c.env.DB, c.env, ownerId)
+    return c.json({
+      capabilities: await capabilityStatuses(c.env.DB, c.env),
+    })
+  }
 
   return c.json(
     {
-      result: outcome,
-      capabilities: await capabilityStatuses(c.env.DB, c.env),
+      error: `This build has no adapter for the "${capability}" capability yet, so there is nothing to verify.`,
+      code: 'capability_not_implemented',
+      implemented: false,
     },
-    status as 200,
+    400,
   )
 })

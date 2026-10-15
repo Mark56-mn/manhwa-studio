@@ -17,6 +17,7 @@ const TABLES = [
   'projects',
   'users',
   'd1_migrations',
+  'assets',
 ]
 
 async function dropTables(tables: string[] = TABLES): Promise<void> {
@@ -55,9 +56,9 @@ describe('database initialization', () => {
     expect(body.status).toBe('degraded')
     expect(body.checks.database.state).toBe('failed')
     expect(body.checks.database.detail).toContain('no studio schema yet')
-    expect(body.checks.database.missing).toHaveLength(10)
+    expect(body.checks.database.missing).toHaveLength(11)
     expect(body.migrations.applied).toBe(false)
-    expect(body.migrations.pending).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
+    expect(body.migrations.pending).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_phase_b_assets.sql'])
   })
 
   it('creates the schema once, then reports the database as verified', async () => {
@@ -65,7 +66,7 @@ describe('database initialization', () => {
     expect(first.status).toBe(200)
     const firstBody = (await first.json()) as { status: string; applied: string[]; detail: string }
     expect(firstBody.status).toBe('initialized')
-    expect(firstBody.applied).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
+    expect(firstBody.applied).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_phase_b_assets.sql'])
 
     const health = (await (await SELF.fetch(`${ORIGIN}/api/health`)).json()) as {
       checks: { database: { state: string } }
@@ -73,7 +74,7 @@ describe('database initialization', () => {
     }
     expect(health.checks.database.state).toBe('connected_verified')
     expect(health.migrations.applied).toBe(true)
-    expect(health.migrations.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
+    expect(health.migrations.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_phase_b_assets.sql'])
 
     const again = await SELF.fetch(`${ORIGIN}/api/bootstrap`, { method: 'POST', headers: { Origin: ORIGIN } })
     expect(again.status).toBe(200)
@@ -96,8 +97,8 @@ describe('database initialization', () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as { status: string; applied: string[]; recorded: string[] }
     expect(body.status).toBe('upgraded')
-    expect(body.applied).toEqual(['0002_phase_b_scripts.sql'])
-    expect(body.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql'])
+    expect(body.applied).toEqual(['0002_phase_b_scripts.sql', '0003_phase_b_assets.sql'])
+    expect(body.recorded).toEqual(['0001_init.sql', '0002_phase_b_scripts.sql', '0003_phase_b_assets.sql'])
 
     const health = (await (await SELF.fetch(`${ORIGIN}/api/health`)).json()) as {
       checks: { database: { state: string } }
@@ -113,7 +114,7 @@ describe('database initialization', () => {
     expect(response.status).toBe(409)
     const body = (await response.json()) as { status: string; missing: string[] }
     expect(body.status).toBe('refused')
-    expect(body.missing).toEqual(['activity_events'])
+    expect(body.missing).toEqual(['activity_events', 'assets'])
   })
 
   it('requires a same-origin request to initialize', async () => {

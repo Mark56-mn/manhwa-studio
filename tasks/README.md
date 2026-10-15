@@ -20,4 +20,5 @@ Rules:
 | Task | Title | Status |
 | --- | --- | --- |
 | [TASK-001](TASK-001-online-foundation.md) | Online foundation (Phase A) | Complete, preview deployed |
-| TASK-002 | Provider selection + real script generation (Phase B start) | Not started |
+| [TASK-002](TASK-002-provider-and-script.md) | Provider selection + real script generation (Phase B start) | Complete, preview deployed |
+| TASK-003 | Object storage + assets (Phase B) | Not started |

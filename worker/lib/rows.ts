@@ -295,3 +295,44 @@ export function serializeProviderCheck(row: ProviderCheckRow) {
     checkedAt: row.checked_at,
   }
 }
+
+export type AssetType = 'image' | 'audio' | 'video' | 'script' | 'other'
+export type AssetStatus = 'uploading' | 'uploaded' | 'failed' | 'deleted'
+
+export interface AssetRow {
+  id: string
+  project_id: string
+  episode_id: string | null
+  type: AssetType
+  storage_key: string
+  content_type: string
+  content_length: number
+  checksum: string
+  metadata_json: string
+  status: AssetStatus
+  created_at: string
+}
+
+export function serializeAsset(row: AssetRow) {
+  let metadata: unknown
+  try {
+    metadata = JSON.parse(row.metadata_json)
+  } catch {
+    metadata = { unparsable: true }
+  }
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    episodeId: row.episode_id,
+    type: row.type,
+    storageKey: row.storage_key,
+    contentType: row.content_type,
+    contentLength: row.content_length,
+    checksum: row.checksum,
+    metadata,
+    status: row.status,
+    createdAt: row.created_at,
+  }
+}
+
+export type SerializedAsset = ReturnType<typeof serializeAsset>
