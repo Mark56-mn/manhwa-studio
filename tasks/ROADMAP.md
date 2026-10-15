@@ -1,55 +1,38 @@
 # Roadmap
 
-Phase A is complete: the studio is online, authenticated, and persists real
-project data. The roadmap below is ordered by "what unblocks the owner next".
+Phase A is complete. Phase B has a verified script-generation foundation and R2 asset-storage implementation. The next priority is making provider selection safe and resilient, then completing a real media pipeline before automation and publishing.
 
-## Phase A  online foundation (complete)
+## Completed foundation
 
-- [x] Responsive studio shell, dark blue/violet theme, usable on a phone.
-- [x] Sign in with Freebuff, enforced on the server for every private route.
-- [x] Project create/list/detail/edit/delete, persisted in D1.
-- [x] Seasons, episodes (auto-numbered, staged status), characters, story bible.
-- [x] Production history feed recording real actions.
-- [x] `/api/health` readiness from real checks (database, assets, auth config).
-- [x] `/api/integrations` honest capability status.
-- [x] SQL migration + documented apply steps.
-- [x] Tests: API/authorization/CSRF integration specs against real D1 in workerd.
-- [x] Deployment on one origin with preview/production environments.
+- [x] **Phase A:** Responsive studio shell, Freebuff authentication, private routes, D1-backed projects/seasons/episodes/characters/story bible, activity history, health/integration status, migrations and preview deployment.
+- [x] **TASK-002:** Provider adapters and versioned script generation. Provider registry currently includes OpenAI-compatible, OpenRouter, Anthropic, Google and custom adapters; scripts are versioned and approvals append-only. See `handoffs/HANDOFF-002-provider-and-script.md`.
+- [x] **TASK-003:** R2 object storage and asset metadata/API. Binary media belongs in R2, not D1. See `tasks/TASK-003-object-storage.md` and `handoffs/HANDOFF-003-object-storage.md`.
 
-## Phase B  first real production (next)
+## Next task
 
-Order matters: provider choice, then artifacts, then assembly.
+- [ ] **TASK-004 — Central AI router, bounded failover, Baseten and NVIDIA candidates.** Route script generation through one router; preserve existing providers; add Baseten at `https://inference.baseten.co/v1` and NVIDIA NIM where verified; use live documentation and verified model IDs; enforce bounded retries and a zero-cost-only/default-deny policy. Baseten is usage-priced; do not assume trial credits or free inference. Owner must explicitly authorize credit consumption or paid use. Full instructions: `tasks/TASK-004-ai-router-failover.md`.
 
-1. **TASK-002  provider adapters + real script generation. (done)**
-   Multi-provider adapter layer behind `SCRIPT_*` (`openai`, `openrouter`,
-   `anthropic`, `google`, `custom`), real authenticated verification recorded in
-   `provider_checks`, immutable `script_versions` with parsed `scenes`, an
-   append-only `script_approvals` review trail, and an episode workspace UI.
-   See `handoffs/HANDOFF-002-provider-and-script.md`.
-2. **TASK-003  object storage. (done)** Provision R2, add the `assets` table, and
-   store generated media as objects with metadata rows (never binaries in D1).
-   See `handoffs/HANDOFF-003-object-storage.md`.
-3. **TASK-004  image generation.** Scene + character art with continuity
-   references from the story bible and the `scenes.image_prompt` written by
-   TASK-002; store real files, record provider/model/dimensions.
-4. **TASK-005  voice generation.** Narration audio per scene; store artifact +
-   voice settings.
-5. **TASK-006  video assembly.** Render scenes + narration + captions into a
-   playable file; validate with media tools; owner plays it before approval.
+## Remaining tasks — execute one task per agent run
 
-## Phase C  reliable automation
+The full acceptance criteria and handoff requirements are in `tasks/PHASE-B-TO-E-EXECUTION-PLAN.md`.
 
-Durable job queue with retries/timeouts/cancellation, director task graph with
-dependencies, worker run logs, remote GPU/notebook render worker, and recovery
-after a worker disconnects.
+- [ ] **TASK-005 — Real image-generation adapter and asset persistence.** Generate a real scene image through a verified compatible model; validate bytes/dimensions; store in R2 and record provenance. No placeholder images.
+- [ ] **TASK-006 — Character continuity and scene-image workflow.** Use story bible/character references; preserve image versions; let owner select/regenerate scene art.
+- [ ] **TASK-007 — Voice/narration adapter and audio assets.** Verify price/rights/limits; generate or import real narration; validate and store audio in R2; owner preview.
+- [ ] **TASK-008 — Video assembly worker.** Use an external FFmpeg worker, not a Cloudflare request; assemble images, narration and captions into a validated playable motion-comic video.
+- [ ] **TASK-009 — Durable job orchestration and recovery.** Add idempotent jobs, dependency graph, bounded retries/timeouts/cancellation, worker logs and restart recovery.
+- [ ] **TASK-010 — Director/showrunner planning.** Produce structured episode plans grounded in the story bible; immutable plan versions; owner approval before downstream generation.
+- [ ] **TASK-011 — YouTube OAuth and private/unlisted upload.** Secure OAuth, resumable upload, real video ID and processing state; private/unlisted by default.
+- [ ] **TASK-012 — Explicit publication approval.** Public visibility requires a separate authenticated owner confirmation and an append-only audit record; automation cannot publish by itself.
+- [ ] **TASK-013 — Editing, continuity, accessibility and polish.** Versioned edits, continuity warnings, captions, mobile accessibility, usage transparency and audit history.
+- [ ] **TASK-014 — End-to-end release rehearsal and security review.** Verify each real artifact through the pipeline, document cost/licensing/quota/security/recovery evidence, and keep public release disabled until the owner authorizes it.
 
-## Phase D  publishing
+## Required task-loop protocol
 
-YouTube OAuth, private/unlisted upload, verified video id + processing status,
-per-episode approval record, public publication only after explicit
-authorisation.
-
-## Phase E  polish
-
-Editing tools, continuity checking, character consistency scoring, scheduling,
-analytics, advanced automation.
+1. Read `AGENT_HANDOFF.md`, this roadmap, `docs/MASTER_BLUEPRINT.md`, the active task and latest dated handoff.
+2. Verify the current repository/branch state and inspect existing code before editing.
+3. Work on **one task only**. The one-hour session is a target, not a completion guarantee.
+4. Run actual checks and report passed, failed and not run. Mocked provider tests are not live provider tests.
+5. Update the task, this roadmap and `AGENT_HANDOFF.md`; write a dated handoff with exact next task, blockers and evidence.
+6. Commit/push when possible. If incomplete or failing, stop with an honest handoff and make the next session a focused continuation/repair task.
+7. Never expose keys, silently fall back to paid services, claim a stage complete without a validated artifact, or publish production/public YouTube content without explicit owner authorization.
